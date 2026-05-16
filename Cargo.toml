@@ -1,6 +1,6 @@
 [package]
 name = "scenekit-rs"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/doom-fish/scenekit-rs"
@@ -43,8 +43,8 @@ cargo-clippy = []
 
 [dependencies]
 libc = "0.2"
-apple-metal = { path = "../apple-metal-rs", version = ">=0.5.0, <0.6" }
-apple-cf = { path = "../apple-cf-rs", version = ">=0.4.0, <0.6" }
+apple-metal = ">=0.5.0, <0.7"
+apple-cf = ">=0.4.0, <0.7"
 
 [package.metadata.docs.rs]
 all-features = true

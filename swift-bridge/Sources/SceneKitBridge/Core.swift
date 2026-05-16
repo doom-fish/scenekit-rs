@@ -6,6 +6,8 @@ import ModelIO
 import QuartzCore
 import SceneKit
 
+public typealias ScnReleaseContextCallback = @convention(c) (UnsafeMutableRawPointer?) -> Void
+
 @inline(__always)
 func scnRetain(_ object: AnyObject) -> UnsafeMutableRawPointer {
     Unmanaged.passRetained(object).toOpaque()

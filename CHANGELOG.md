@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.1] - 2026-05-16
+
+- Added `SCNSceneRenderer`, `SCNSceneSource`, `SCNPhysicsWorld`, `SCNProgram`, and `SCNCameraController` bindings plus their delegate/constant surfaces
+- Added integration tests, OBJ scene-source fixture coverage, and new camera-controller / scene-source / program examples
+- Switched `apple-cf` and `apple-metal` to registry dependencies for reproducible builds outside the local sibling-checkout setup
+
 ## [0.2.0] - 2026-05-16
 
 - Added dedicated `SCNAnimation`, `SCNTransaction`, `SCNConstraint`, `SCNParticleSystem`, `SCNAudioPlayer`, `SCNHitTest`, `SCNTechnique`, and `SCNView` bridges and Rust modules

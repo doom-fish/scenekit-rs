@@ -2,6 +2,8 @@ use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 
+pub trait Sealed {}
+
 macro_rules! handle_type {
     ($name:ident) => {
         pub struct $name {
@@ -61,4 +63,11 @@ pub fn cstring_from_str(value: &str) -> Option<CString> {
 
 pub fn cstring_from_path(path: &Path) -> Option<CString> {
     CString::new(path.as_os_str().as_bytes()).ok()
+}
+
+pub fn lookup_string_constant(symbol: &str) -> String {
+    let c_string = cstring_from_str(symbol)
+        .expect("SceneKit constant symbol names never contain interior NUL bytes");
+    unsafe { crate::error::take_string(crate::ffi::scn_constant_lookup(c_string.as_ptr())) }
+        .unwrap_or_else(|| symbol.to_owned())
 }

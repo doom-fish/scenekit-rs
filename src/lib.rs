@@ -10,6 +10,7 @@ pub mod action;
 pub mod animation;
 pub mod audio;
 pub mod camera;
+pub mod camera_controller;
 pub mod color;
 pub mod constraint;
 pub mod error;
@@ -22,8 +23,12 @@ pub mod math;
 pub mod node;
 pub mod particle_system;
 pub mod physics;
+pub mod physics_world;
+pub mod program;
 pub mod renderer;
 pub mod scene;
+pub mod scene_renderer;
+pub mod scene_source;
 pub mod technique;
 pub mod transaction;
 pub mod view;
@@ -32,6 +37,10 @@ pub use action::Action;
 pub use animation::{Animation, AnimationPlayer};
 pub use audio::{AudioPlayer, AudioSource};
 pub use camera::Camera;
+pub use camera_controller::{
+    CameraControlConfiguration, CameraController, CameraControllerDelegate,
+    CameraControllerDelegateCallbacks, InteractionMode,
+};
 pub use color::Color;
 pub use constraint::Constraint;
 pub use error::SceneKitError;
@@ -43,8 +52,19 @@ pub use math::{Matrix4, Vector3, Vector4};
 pub use node::Node;
 pub use particle_system::ParticleSystem;
 pub use physics::{PhysicsBody, PhysicsBodyType};
+pub use physics_world::{
+    PhysicsContact, PhysicsContactDelegate, PhysicsContactDelegateCallbacks, PhysicsWorld,
+};
+pub use program::{
+    BufferFrequency, BufferStream, Program, ProgramBufferBinding, ProgramDelegate, Shadable,
+};
 pub use renderer::{read_texture_bytes, LoadAction, RenderPassDescriptor, Renderer, StoreAction};
 pub use scene::Scene;
+pub use scene_renderer::{
+    AntialiasingMode, DebugOptions, RenderingAPI, SceneRenderer, SceneRendererDelegate,
+    SceneRendererDelegateCallbacks,
+};
+pub use scene_source::{SceneSource, SceneSourceEntryClass, SceneSourceStatus};
 pub use technique::Technique;
 pub use transaction::Transaction;
 pub use view::View;
@@ -53,10 +73,16 @@ pub use apple_cf::cg::{CGImage, CGPoint, CGRect, CGSize};
 
 pub mod prelude {
     pub use crate::{
-        read_texture_bytes, Action, Animation, AnimationPlayer, AudioPlayer, AudioSource, Camera,
-        Color, Constraint, Geometry, HitTestResult, HitTestResults, Light, LightType, LoadAction,
-        Material, MaterialProperty, Matrix4, Node, ParticleSystem, PhysicsBody, PhysicsBodyType,
-        RenderPassDescriptor, Renderer, Scene, SceneKitError, ShadowMode, StoreAction, Technique,
+        read_texture_bytes, Action, Animation, AnimationPlayer, AntialiasingMode, AudioPlayer,
+        AudioSource, BufferFrequency, BufferStream, Camera, CameraControlConfiguration,
+        CameraController, CameraControllerDelegate, CameraControllerDelegateCallbacks, Color,
+        Constraint, DebugOptions, Geometry, HitTestResult, HitTestResults, InteractionMode, Light,
+        LightType, LoadAction, Material, MaterialProperty, Matrix4, Node, ParticleSystem,
+        PhysicsBody, PhysicsBodyType, PhysicsContact, PhysicsContactDelegate,
+        PhysicsContactDelegateCallbacks, PhysicsWorld, Program, ProgramBufferBinding,
+        ProgramDelegate, RenderPassDescriptor, Renderer, RenderingAPI, Scene, SceneKitError,
+        SceneRenderer, SceneRendererDelegate, SceneRendererDelegateCallbacks, SceneSource,
+        SceneSourceEntryClass, SceneSourceStatus, Shadable, ShadowMode, StoreAction, Technique,
         Transaction, Vector3, Vector4, View,
     };
 }

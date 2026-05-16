@@ -3,10 +3,10 @@
 _Audit scope: top-level public SceneKit classes/protocols/enums/options/structs/exported constants/exported C helpers from `SceneKit.framework/Headers`. Objective-C methods and properties are intentionally out of scope for this report._
 
 SDK_PUBLIC_SYMBOLS: 255
-VERIFIED: 40
-GAPS: 206
+VERIFIED: 97
+GAPS: 149
 EXEMPT: 9
-COVERAGE_PCT: 16.26%
+COVERAGE_PCT: 38.04%
 
 _Inventory mix: 66 interfaces, 15 protocols, 36 enums, 4 option sets, 2 structs, 120 exported constants, 12 exported C helpers._
 
@@ -16,17 +16,29 @@ _Inventory mix: 66 interfaces, 15 protocols, 36 enums, 4 option sets, 2 structs,
 | SCNAction | interface | SCNAction.h | Action |
 | SCNAnimation | interface | SCNAnimation.h | Animation |
 | SCNAnimationPlayer | interface | SCNAnimation.h | AnimationPlayer |
+| SCNAntialiasingMode | enum | SCNSceneRenderer.h | scene_renderer::AntialiasingMode |
 | SCNAudioPlayer | interface | SCNAudioSource.h | AudioPlayer |
 | SCNAudioSource | interface | SCNAudioSource.h | AudioSource |
 | SCNBox | interface | SCNParametricGeometry.h | Geometry::box_geometry |
+| SCNBufferFrequency | enum | SCNShadable.h | program::BufferFrequency |
+| SCNBufferStream | protocol | SCNShadable.h | BufferStream |
 | SCNCamera | interface | SCNCamera.h | Camera |
+| SCNCameraControlConfiguration | protocol | SCNView.h | CameraControlConfiguration |
+| SCNCameraController | interface | SCNCameraController.h | CameraController |
+| SCNCameraControllerDelegate | protocol | SCNCameraController.h | CameraControllerDelegate |
 | SCNCone | interface | SCNParametricGeometry.h | Geometry::cone |
+| SCNConsistencyElementIDErrorKey | const | SCNSceneSource.h | scene_source::consistency_element_id_error_key |
+| SCNConsistencyElementTypeErrorKey | const | SCNSceneSource.h | scene_source::consistency_element_type_error_key |
+| SCNConsistencyLineNumberErrorKey | const | SCNSceneSource.h | scene_source::consistency_line_number_error_key |
 | SCNConstraint | interface | SCNConstraint.h | Constraint |
 | SCNCylinder | interface | SCNParametricGeometry.h | Geometry::cylinder |
+| SCNDebugOptions | options | SCNSceneRenderer.h | scene_renderer::DebugOptions |
+| SCNDetailedErrorsKey | const | SCNSceneSource.h | scene_source::detailed_errors_key |
 | SCNDistanceConstraint | interface | SCNConstraint.h | Constraint::distance |
 | SCNFloor | interface | SCNParametricGeometry.h | Geometry::floor |
 | SCNGeometry | interface | SCNGeometry.h | Geometry |
 | SCNHitTestResult | interface | SCNHitTest.h | HitTestResult |
+| SCNInteractionMode | enum | SCNCameraController.h | camera_controller::InteractionMode |
 | SCNLight | interface | SCNLight.h | Light |
 | SCNLightTypeAmbient | const | SCNLight.h | LightType::Ambient |
 | SCNLightTypeArea | const | SCNLight.h | LightType::Area |
@@ -42,9 +54,54 @@ _Inventory mix: 66 interfaces, 15 protocols, 36 enums, 4 option sets, 2 structs,
 | SCNParticleSystem | interface | SCNParticleSystem.h | ParticleSystem |
 | SCNPhysicsBody | interface | SCNPhysicsBody.h | PhysicsBody |
 | SCNPhysicsBodyType | enum | SCNPhysicsBody.h | PhysicsBodyType |
+| SCNPhysicsContact | interface | SCNPhysicsContact.h | PhysicsContact |
+| SCNPhysicsContactDelegate | protocol | SCNPhysicsWorld.h | PhysicsContactDelegate |
+| SCNPhysicsTestBackfaceCullingKey | const | SCNPhysicsWorld.h | physics_world::physics_test_backface_culling_key |
+| SCNPhysicsTestCollisionBitMaskKey | const | SCNPhysicsWorld.h | physics_world::physics_test_collision_bit_mask_key |
+| SCNPhysicsTestSearchModeAll | const | SCNPhysicsWorld.h | physics_world::physics_test_search_mode_all |
+| SCNPhysicsTestSearchModeAny | const | SCNPhysicsWorld.h | physics_world::physics_test_search_mode_any |
+| SCNPhysicsTestSearchModeClosest | const | SCNPhysicsWorld.h | physics_world::physics_test_search_mode_closest |
+| SCNPhysicsTestSearchModeKey | const | SCNPhysicsWorld.h | physics_world::physics_test_search_mode_key |
+| SCNPhysicsWorld | interface | SCNPhysicsWorld.h | Scene::physics_world / PhysicsWorld |
 | SCNPlane | interface | SCNParametricGeometry.h | Geometry::plane |
+| SCNProgram | interface | SCNShadable.h | Program |
+| SCNProgramDelegate | protocol | SCNShadable.h | ProgramDelegate |
+| SCNProgramMappingChannelKey | const | SCNShadable.h | program::program_mapping_channel_key |
 | SCNRenderer | interface | SCNRenderer.h | Renderer |
+| SCNRenderingAPI | enum | SCNSceneRenderer.h | scene_renderer::RenderingAPI |
 | SCNScene | interface | SCNScene.h | Scene |
+| SCNSceneRenderer | protocol | SCNSceneRenderer.h | SceneRenderer for Renderer and View |
+| SCNSceneRendererDelegate | protocol | SCNSceneRenderer.h | SceneRendererDelegate |
+| SCNSceneSource | interface | SCNSceneSource.h | SceneSource |
+| SCNSceneSourceAnimationImportPolicyDoNotPlay | const | SCNSceneSource.h | scene_source::scene_source_animation_import_policy_do_not_play |
+| SCNSceneSourceAnimationImportPolicyKey | const | SCNSceneSource.h | scene_source::scene_source_animation_import_policy_key |
+| SCNSceneSourceAnimationImportPolicyPlay | const | SCNSceneSource.h | scene_source::scene_source_animation_import_policy_play |
+| SCNSceneSourceAnimationImportPolicyPlayRepeatedly | const | SCNSceneSource.h | scene_source::scene_source_animation_import_policy_play_repeatedly |
+| SCNSceneSourceAnimationImportPolicyPlayUsingSceneTimeBase | const | SCNSceneSource.h | scene_source::scene_source_animation_import_policy_play_using_scene_time_base |
+| SCNSceneSourceAssetAuthorKey | const | SCNSceneSource.h | scene_source::scene_source_asset_author_key |
+| SCNSceneSourceAssetAuthoringToolKey | const | SCNSceneSource.h | scene_source::scene_source_asset_authoring_tool_key |
+| SCNSceneSourceAssetContributorsKey | const | SCNSceneSource.h | scene_source::scene_source_asset_contributors_key |
+| SCNSceneSourceAssetCreatedDateKey | const | SCNSceneSource.h | scene_source::scene_source_asset_created_date_key |
+| SCNSceneSourceAssetDirectoryURLsKey | const | SCNSceneSource.h | scene_source::scene_source_asset_directory_urls_key |
+| SCNSceneSourceAssetModifiedDateKey | const | SCNSceneSource.h | scene_source::scene_source_asset_modified_date_key |
+| SCNSceneSourceAssetUnitKey | const | SCNSceneSource.h | scene_source::scene_source_asset_unit_key |
+| SCNSceneSourceAssetUnitMeterKey | const | SCNSceneSource.h | scene_source::scene_source_asset_unit_meter_key |
+| SCNSceneSourceAssetUnitNameKey | const | SCNSceneSource.h | scene_source::scene_source_asset_unit_name_key |
+| SCNSceneSourceAssetUpAxisKey | const | SCNSceneSource.h | scene_source::scene_source_asset_up_axis_key |
+| SCNSceneSourceCheckConsistencyKey | const | SCNSceneSource.h | scene_source::scene_source_check_consistency_key |
+| SCNSceneSourceConvertToYUpKey | const | SCNSceneSource.h | scene_source::scene_source_convert_to_y_up_key |
+| SCNSceneSourceConvertUnitsToMetersKey | const | SCNSceneSource.h | scene_source::scene_source_convert_units_to_meters_key |
+| SCNSceneSourceCreateNormalsIfAbsentKey | const | SCNSceneSource.h | scene_source::scene_source_create_normals_if_absent_key |
+| SCNSceneSourceFlattenSceneKey | const | SCNSceneSource.h | scene_source::scene_source_flatten_scene_key |
+| SCNSceneSourceLoadingOptionPreserveOriginalTopology | const | SCNSceneSource.h | scene_source::scene_source_loading_option_preserve_original_topology |
+| SCNSceneSourceOverrideAssetURLsKey | const | SCNSceneSource.h | scene_source::scene_source_override_asset_urls_key |
+| SCNSceneSourceStatus | enum | SCNSceneSource.h | SceneSourceStatus |
+| SCNSceneSourceStrictConformanceKey | const | SCNSceneSource.h | scene_source::scene_source_strict_conformance_key |
+| SCNShadable | protocol | SCNShadable.h | Shadable for Material and Geometry |
+| SCNShaderModifierEntryPointFragment | const | SCNShadable.h | program::shader_modifier_entry_point_fragment |
+| SCNShaderModifierEntryPointGeometry | const | SCNShadable.h | program::shader_modifier_entry_point_geometry |
+| SCNShaderModifierEntryPointLightingModel | const | SCNShadable.h | program::shader_modifier_entry_point_lighting_model |
+| SCNShaderModifierEntryPointSurface | const | SCNShadable.h | program::shader_modifier_entry_point_surface |
 | SCNShadowMode | enum | SCNLight.h | ShadowMode |
 | SCNSphere | interface | SCNParametricGeometry.h | Geometry::sphere |
 | SCNTechnique | interface | SCNTechnique.h | Technique |
@@ -62,28 +119,17 @@ _Inventory mix: 66 interfaces, 15 protocols, 36 enums, 4 option sets, 2 structs,
 | SCNActionable | protocol | SCNAction.h | No public Rust protocol/delegate bridge. |
 | SCNAnimatable | protocol | SCNAnimation.h | No public Rust protocol/delegate bridge. |
 | SCNAnimationEvent | interface | SCNAnimation.h | Advanced animation timing/event APIs are not wrapped. |
-| SCNAntialiasingMode | enum | SCNSceneRenderer.h | Renderer/view configuration enum is not exposed. |
 | SCNAvoidOccluderConstraint | interface | SCNConstraint.h | Only SCNLookAtConstraint and SCNDistanceConstraint are wrapped. |
 | SCNAvoidOccluderConstraintDelegate | protocol | SCNConstraint.h | No public Rust protocol/delegate bridge. |
 | SCNBillboardAxis | options | SCNConstraint.h | Constraint option set not exposed. |
 | SCNBillboardConstraint | interface | SCNConstraint.h | Only SCNLookAtConstraint and SCNDistanceConstraint are wrapped. |
 | SCNBlendMode | enum | SCNMaterial.h | Material/render-state enum is not exposed. |
 | SCNBoundingVolume | protocol | SCNBoundingVolume.h | No public Rust protocol/delegate bridge. |
-| SCNBufferFrequency | enum | SCNShadable.h | No Rust enum/options wrapper. |
-| SCNBufferStream | protocol | SCNShadable.h | No public Rust protocol/delegate bridge. |
-| SCNCameraControlConfiguration | protocol | SCNView.h | No public Rust protocol/delegate bridge. |
-| SCNCameraController | interface | SCNCameraController.h | Interactive camera-controller APIs are not wrapped. |
-| SCNCameraControllerDelegate | protocol | SCNCameraController.h | No public Rust protocol/delegate bridge. |
 | SCNCameraProjectionDirection | enum | SCNCamera.h | No Rust enum/options wrapper. |
 | SCNCapsule | interface | SCNParametricGeometry.h | Only box/sphere/cylinder/cone/plane/floor/text geometry constructors are wrapped. |
 | SCNChamferMode | enum | SCNParametricGeometry.h | No Rust enum/options wrapper. |
 | SCNColorMask | options | SceneKitTypes.h | Material/render-state enum is not exposed. |
-| SCNConsistencyElementIDErrorKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNConsistencyElementTypeErrorKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNConsistencyLineNumberErrorKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
 | SCNCullMode | enum | SCNMaterial.h | Material/render-state enum is not exposed. |
-| SCNDebugOptions | options | SCNSceneRenderer.h | Renderer/view configuration enum is not exposed. |
-| SCNDetailedErrorsKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
 | SCNErrorDomain | const | SceneKitTypes.h | No wrapper for this exported SceneKit constant. |
 | SCNExportJavaScriptModule | function | SCNJavascript.h | No wrapper for this exported C helper. |
 | SCNFillMode | enum | SCNMaterial.h | Material/render-state enum is not exposed. |
@@ -114,7 +160,6 @@ _Inventory mix: 66 interfaces, 15 protocols, 36 enums, 4 option sets, 2 structs,
 | SCNHitTestSearchMode | enum | SCNHitTest.h | Hit-test search-mode enum is not exposed. |
 | SCNHitTestSortResultsKey | const | SCNHitTest.h | Hit-test option constants are not exposed. |
 | SCNIKConstraint | interface | SCNConstraint.h | Only SCNLookAtConstraint and SCNDistanceConstraint are wrapped. |
-| SCNInteractionMode | enum | SCNCameraController.h | No Rust enum/options wrapper. |
 | SCNLevelOfDetail | interface | SCNLevelOfDetail.h | Asset-pipeline/import APIs are not wrapped. |
 | SCNLightAreaType | enum | SCNLight.h | Only basic light type/shadow mode enums are wrapped. |
 | SCNLightProbeType | enum | SCNLight.h | Only basic light type/shadow mode enums are wrapped. |
@@ -174,8 +219,6 @@ _Inventory mix: 66 interfaces, 15 protocols, 36 enums, 4 option sets, 2 structs,
 | SCNPhysicsBehavior | interface | SCNPhysicsBehavior.h | Only SCNPhysicsBody is wrapped; world/shape/behavior APIs are absent. |
 | SCNPhysicsCollisionCategory | options | SCNPhysicsBody.h | Physics enums/options beyond SCNPhysicsBodyType are absent. |
 | SCNPhysicsConeTwistJoint | interface | SCNPhysicsBehavior.h | Only SCNPhysicsBody is wrapped; world/shape/behavior APIs are absent. |
-| SCNPhysicsContact | interface | SCNPhysicsContact.h | Only SCNPhysicsBody is wrapped; world/shape/behavior APIs are absent. |
-| SCNPhysicsContactDelegate | protocol | SCNPhysicsWorld.h | No public Rust protocol/delegate bridge. |
 | SCNPhysicsField | interface | SCNPhysicsField.h | Only SCNPhysicsBody is wrapped; world/shape/behavior APIs are absent. |
 | SCNPhysicsFieldScope | enum | SCNPhysicsField.h | Physics enums/options beyond SCNPhysicsBodyType are absent. |
 | SCNPhysicsHingeJoint | interface | SCNPhysicsBehavior.h | Only SCNPhysicsBody is wrapped; world/shape/behavior APIs are absent. |
@@ -188,65 +231,22 @@ _Inventory mix: 66 interfaces, 15 protocols, 36 enums, 4 option sets, 2 structs,
 | SCNPhysicsShapeTypeConvexHull | const | SCNPhysicsShape.h | Physics option/search constants are not exposed. |
 | SCNPhysicsShapeTypeKey | const | SCNPhysicsShape.h | Physics option/search constants are not exposed. |
 | SCNPhysicsSliderJoint | interface | SCNPhysicsBehavior.h | Only SCNPhysicsBody is wrapped; world/shape/behavior APIs are absent. |
-| SCNPhysicsTestBackfaceCullingKey | const | SCNPhysicsWorld.h | Physics option/search constants are not exposed. |
-| SCNPhysicsTestCollisionBitMaskKey | const | SCNPhysicsWorld.h | Physics option/search constants are not exposed. |
-| SCNPhysicsTestSearchModeAll | const | SCNPhysicsWorld.h | Physics option/search constants are not exposed. |
-| SCNPhysicsTestSearchModeAny | const | SCNPhysicsWorld.h | Physics option/search constants are not exposed. |
-| SCNPhysicsTestSearchModeClosest | const | SCNPhysicsWorld.h | Physics option/search constants are not exposed. |
-| SCNPhysicsTestSearchModeKey | const | SCNPhysicsWorld.h | Physics option/search constants are not exposed. |
 | SCNPhysicsVehicle | interface | SCNPhysicsBehavior.h | Only SCNPhysicsBody is wrapped; world/shape/behavior APIs are absent. |
 | SCNPhysicsVehicleWheel | interface | SCNPhysicsBehavior.h | Only SCNPhysicsBody is wrapped; world/shape/behavior APIs are absent. |
-| SCNPhysicsWorld | interface | SCNPhysicsWorld.h | Only SCNPhysicsBody is wrapped; world/shape/behavior APIs are absent. |
 | SCNPreferLowPowerDeviceKey | const | SCNView.h | SCNView option constants are not exposed. |
 | SCNPreferredDeviceKey | const | SCNView.h | SCNView option constants are not exposed. |
 | SCNPreferredRenderingAPIKey | const | SCNView.h | SCNView option constants are not exposed. |
-| SCNProgram | interface | SCNShadable.h | Shader/program APIs are not wrapped. |
-| SCNProgramDelegate | protocol | SCNShadable.h | No public Rust protocol/delegate bridge. |
-| SCNProgramMappingChannelKey | const | SCNShadable.h | Shader/program string constants are not exposed. |
 | SCNProjectionTransform | const | SCNNode.h | Shader semantic constants are not exposed. |
 | SCNPyramid | interface | SCNParametricGeometry.h | Only box/sphere/cylinder/cone/plane/floor/text geometry constructors are wrapped. |
 | SCNReferenceLoadingPolicy | enum | SCNReferenceNode.h | No Rust enum/options wrapper. |
 | SCNReferenceNode | interface | SCNReferenceNode.h | Asset-pipeline/import APIs are not wrapped. |
-| SCNRenderingAPI | enum | SCNSceneRenderer.h | Renderer/view configuration enum is not exposed. |
 | SCNReplicatorConstraint | interface | SCNConstraint.h | Only SCNLookAtConstraint and SCNDistanceConstraint are wrapped. |
 | SCNSceneEndTimeAttributeKey | const | SCNScene.h | No wrapper for this exported SceneKit constant. |
 | SCNSceneExportDelegate | protocol | SCNScene.h | No public Rust protocol/delegate bridge. |
 | SCNSceneExportDestinationURL | const | SCNScene.h | No wrapper for this exported SceneKit constant. |
 | SCNSceneFrameRateAttributeKey | const | SCNScene.h | No wrapper for this exported SceneKit constant. |
-| SCNSceneRenderer | protocol | SCNSceneRenderer.h | No public Rust protocol/delegate bridge. |
-| SCNSceneRendererDelegate | protocol | SCNSceneRenderer.h | No public Rust protocol/delegate bridge. |
-| SCNSceneSource | interface | SCNSceneSource.h | Asset-pipeline/import APIs are not wrapped. |
-| SCNSceneSourceAnimationImportPolicyDoNotPlay | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAnimationImportPolicyKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAnimationImportPolicyPlay | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAnimationImportPolicyPlayRepeatedly | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAnimationImportPolicyPlayUsingSceneTimeBase | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAssetAuthorKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAssetAuthoringToolKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAssetContributorsKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAssetCreatedDateKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAssetDirectoryURLsKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAssetModifiedDateKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAssetUnitKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAssetUnitMeterKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAssetUnitNameKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceAssetUpAxisKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceCheckConsistencyKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceConvertToYUpKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceConvertUnitsToMetersKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceCreateNormalsIfAbsentKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceFlattenSceneKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceLoadingOptionPreserveOriginalTopology | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceOverrideAssetURLsKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
-| SCNSceneSourceStatus | enum | SCNSceneSource.h | No Rust enum/options wrapper. |
-| SCNSceneSourceStrictConformanceKey | const | SCNSceneSource.h | Scene-source string keys are not exposed. |
 | SCNSceneStartTimeAttributeKey | const | SCNScene.h | No wrapper for this exported SceneKit constant. |
 | SCNSceneUpAxisAttributeKey | const | SCNScene.h | No wrapper for this exported SceneKit constant. |
-| SCNShadable | protocol | SCNShadable.h | No public Rust protocol/delegate bridge. |
-| SCNShaderModifierEntryPointFragment | const | SCNShadable.h | Shader/program string constants are not exposed. |
-| SCNShaderModifierEntryPointGeometry | const | SCNShadable.h | Shader/program string constants are not exposed. |
-| SCNShaderModifierEntryPointLightingModel | const | SCNShadable.h | Shader/program string constants are not exposed. |
-| SCNShaderModifierEntryPointSurface | const | SCNShadable.h | Shader/program string constants are not exposed. |
 | SCNShape | interface | SCNParametricGeometry.h | Only box/sphere/cylinder/cone/plane/floor/text geometry constructors are wrapped. |
 | SCNSkinner | interface | SCNSkinner.h | Asset-pipeline/import APIs are not wrapped. |
 | SCNSliderConstraint | interface | SCNConstraint.h | Only SCNLookAtConstraint and SCNDistanceConstraint are wrapped. |
@@ -264,9 +264,10 @@ _Inventory mix: 66 interfaces, 15 protocols, 36 enums, 4 option sets, 2 structs,
 | SCNViewTransform | const | SCNNode.h | Shader semantic constants are not exposed. |
 | SCNWrapMode | enum | SCNMaterialProperty.h | Material/render-state enum is not exposed. |
 
+
 ## ⏭️ EXEMPT
-| Symbol | Kind | Header | Reason | SDK attribute |
-| --- | --- | --- | --- | --- |
+| Symbol | Kind | Header | Rationale |
+| --- | --- | --- | --- |
 | SCNLayer | interface | SCNLayer.h | OpenGL-backed layer is deprecated on macOS and intentionally skipped. | SCN_GL_DEPRECATED_MAC(10_8, 10_14) |
 | SCNLightAttenuationEndKey | const | SceneKitDeprecated.h | Deprecated light attribute key skipped by policy. | API_DEPRECATED(... macos(10.8, 10.10)) |
 | SCNLightAttenuationFalloffExponentKey | const | SceneKitDeprecated.h | Deprecated light attribute key skipped by policy. | API_DEPRECATED(... macos(10.8, 10.10)) |
