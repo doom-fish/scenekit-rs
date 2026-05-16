@@ -161,4 +161,118 @@ extern "C" {
         out_bytes: *mut c_void,
         bytes_per_row: usize,
     ) -> bool;
+
+    pub fn scn_animation_new_opacity(from: f32, to: f32, duration: f64) -> *mut c_void;
+    pub fn scn_animation_get_duration(animation: *mut c_void) -> f64;
+    pub fn scn_animation_set_duration(animation: *mut c_void, duration: f64);
+    pub fn scn_animation_get_repeat_count(animation: *mut c_void) -> f64;
+    pub fn scn_animation_set_repeat_count(animation: *mut c_void, repeat_count: f64);
+    pub fn scn_animation_get_autoreverses(animation: *mut c_void) -> bool;
+    pub fn scn_animation_set_autoreverses(animation: *mut c_void, autoreverses: bool);
+    pub fn scn_animation_get_uses_scene_time_base(animation: *mut c_void) -> bool;
+    pub fn scn_animation_set_uses_scene_time_base(
+        animation: *mut c_void,
+        uses_scene_time_base: bool,
+    );
+    pub fn scn_animation_player_new(animation: *mut c_void) -> *mut c_void;
+    pub fn scn_animation_player_animation(player: *mut c_void) -> *mut c_void;
+    pub fn scn_animation_player_get_speed(player: *mut c_void) -> f64;
+    pub fn scn_animation_player_set_speed(player: *mut c_void, speed: f64);
+    pub fn scn_animation_player_get_paused(player: *mut c_void) -> bool;
+    pub fn scn_animation_player_set_paused(player: *mut c_void, paused: bool);
+    pub fn scn_animation_player_play(player: *mut c_void);
+    pub fn scn_animation_player_stop(player: *mut c_void);
+    pub fn scn_node_add_animation_player(
+        node: *mut c_void,
+        player: *mut c_void,
+        key: *const c_char,
+    );
+    pub fn scn_node_animation_player(node: *mut c_void, key: *const c_char) -> *mut c_void;
+
+    pub fn scn_transaction_begin();
+    pub fn scn_transaction_commit();
+    pub fn scn_transaction_flush();
+    pub fn scn_transaction_get_animation_duration() -> f64;
+    pub fn scn_transaction_set_animation_duration(animation_duration: f64);
+    pub fn scn_transaction_get_disable_actions() -> bool;
+    pub fn scn_transaction_set_disable_actions(disable_actions: bool);
+
+    pub fn scn_constraint_new_look_at(target: *mut c_void) -> *mut c_void;
+    pub fn scn_constraint_new_distance(target: *mut c_void) -> *mut c_void;
+    pub fn scn_constraint_get_influence_factor(constraint: *mut c_void) -> f64;
+    pub fn scn_constraint_set_influence_factor(constraint: *mut c_void, influence_factor: f64);
+    pub fn scn_constraint_get_gimbal_lock_enabled(constraint: *mut c_void) -> bool;
+    pub fn scn_constraint_set_gimbal_lock_enabled(
+        constraint: *mut c_void,
+        gimbal_lock_enabled: bool,
+    );
+    pub fn scn_constraint_get_minimum_distance(constraint: *mut c_void) -> f64;
+    pub fn scn_constraint_set_minimum_distance(constraint: *mut c_void, minimum_distance: f64);
+    pub fn scn_constraint_get_maximum_distance(constraint: *mut c_void) -> f64;
+    pub fn scn_constraint_set_maximum_distance(constraint: *mut c_void, maximum_distance: f64);
+    pub fn scn_node_set_constraints(node: *mut c_void, constraints: *mut c_void, count: usize);
+    pub fn scn_node_constraints_count(node: *mut c_void) -> usize;
+
+    pub fn scn_particle_system_new() -> *mut c_void;
+    pub fn scn_particle_system_get_birth_rate(system: *mut c_void) -> f64;
+    pub fn scn_particle_system_set_birth_rate(system: *mut c_void, birth_rate: f64);
+    pub fn scn_particle_system_get_life_span(system: *mut c_void) -> f64;
+    pub fn scn_particle_system_set_life_span(system: *mut c_void, life_span: f64);
+    pub fn scn_particle_system_get_loops(system: *mut c_void) -> bool;
+    pub fn scn_particle_system_set_loops(system: *mut c_void, loops: bool);
+    pub fn scn_node_add_particle_system(node: *mut c_void, system: *mut c_void);
+    pub fn scn_node_remove_all_particle_systems(node: *mut c_void);
+    pub fn scn_node_particle_system_count(node: *mut c_void) -> usize;
+
+    pub fn scn_audio_source_new_url(path: *const c_char) -> *mut c_void;
+    pub fn scn_audio_source_get_volume(source: *mut c_void) -> f32;
+    pub fn scn_audio_source_set_volume(source: *mut c_void, volume: f32);
+    pub fn scn_audio_source_get_positional(source: *mut c_void) -> bool;
+    pub fn scn_audio_source_set_positional(source: *mut c_void, positional: bool);
+    pub fn scn_audio_source_get_loops(source: *mut c_void) -> bool;
+    pub fn scn_audio_source_set_loops(source: *mut c_void, loops: bool);
+    pub fn scn_audio_source_load(source: *mut c_void);
+    pub fn scn_audio_player_new(source: *mut c_void) -> *mut c_void;
+    pub fn scn_audio_player_source(player: *mut c_void) -> *mut c_void;
+    pub fn scn_node_add_audio_player(node: *mut c_void, player: *mut c_void);
+    pub fn scn_node_remove_all_audio_players(node: *mut c_void);
+    pub fn scn_node_audio_player_count(node: *mut c_void) -> usize;
+
+    pub fn scn_view_new(width: f64, height: f64) -> *mut c_void;
+    pub fn scn_view_set_scene(view: *mut c_void, scene: *mut c_void);
+    pub fn scn_view_scene(view: *mut c_void) -> *mut c_void;
+    pub fn scn_view_set_point_of_view(view: *mut c_void, node: *mut c_void);
+    pub fn scn_view_point_of_view(view: *mut c_void) -> *mut c_void;
+    pub fn scn_view_get_allows_camera_control(view: *mut c_void) -> bool;
+    pub fn scn_view_set_allows_camera_control(view: *mut c_void, allows_camera_control: bool);
+    pub fn scn_view_get_renders_continuously(view: *mut c_void) -> bool;
+    pub fn scn_view_set_renders_continuously(view: *mut c_void, renders_continuously: bool);
+    pub fn scn_view_copy_background_color(view: *mut c_void, out_rgba: *mut c_void) -> bool;
+    pub fn scn_view_set_background_color(view: *mut c_void, r: f32, g: f32, b: f32, a: f32);
+    pub fn scn_view_snapshot_size(view: *mut c_void, out_size: *mut f64) -> bool;
+    pub fn scn_view_get_preferred_frames_per_second(view: *mut c_void) -> isize;
+    pub fn scn_view_set_preferred_frames_per_second(
+        view: *mut c_void,
+        preferred_frames_per_second: isize,
+    );
+
+    pub fn scn_view_hit_test(view: *mut c_void, x: f64, y: f64) -> *mut c_void;
+    pub fn scn_hit_test_results_count(results: *mut c_void) -> usize;
+    pub fn scn_hit_test_results_get(results: *mut c_void, index: usize) -> *mut c_void;
+    pub fn scn_hit_test_result_node(result: *mut c_void) -> *mut c_void;
+    pub fn scn_hit_test_result_world_coordinates(
+        result: *mut c_void,
+        out_vec3: *mut c_void,
+    ) -> bool;
+
+    pub fn scn_technique_new_minimal_draw_scene() -> *mut c_void;
+    pub fn scn_technique_dictionary_key_count(technique: *mut c_void) -> usize;
+    pub fn scn_technique_set_float_symbol(technique: *mut c_void, key: *const c_char, value: f64);
+    pub fn scn_technique_get_float_symbol(
+        technique: *mut c_void,
+        key: *const c_char,
+        out_value: *mut f64,
+    ) -> bool;
+    pub fn scn_view_set_technique(view: *mut c_void, technique: *mut c_void);
+    pub fn scn_view_technique(view: *mut c_void) -> *mut c_void;
 }

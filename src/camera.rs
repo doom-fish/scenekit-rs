@@ -48,7 +48,7 @@ impl Camera {
 
     pub fn set_projection_matrix(&self, matrix: Matrix4) {
         unsafe {
-            ffi::scn_camera_set_projection_transform(self.ptr, matrix.as_ptr().cast_mut().cast())
+            ffi::scn_camera_set_projection_transform(self.ptr, matrix.as_ptr().cast_mut().cast());
         };
     }
 }

@@ -1,11 +1,11 @@
 [package]
 name = "scenekit-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/doom-fish/scenekit-rs"
 repository = "https://github.com/doom-fish/scenekit-rs"
-description = "Safe Rust bindings for Apple's SceneKit framework — scene graphs, materials, actions, physics, and offline Metal rendering on macOS"
+description = "Safe Rust bindings for Apple's SceneKit framework — scenes, nodes, animations, particles, audio, views, techniques, and offline Metal rendering on macOS"
 authors = ["Per Johansson <per@doom.fish>"]
 keywords = ["scenekit", "3d", "metal", "macos", "apple"]
 categories = ["api-bindings", "graphics", "os::macos-apis"]
@@ -15,6 +15,7 @@ build = "build.rs"
 include = [
     "src/**/*",
     "examples/**/*",
+    "tests/**/*",
     "swift-bridge/Package.swift",
     "swift-bridge/Sources/**/*",
     "build.rs",
@@ -22,6 +23,7 @@ include = [
     "README.md",
     "LICENSE-*",
     "CHANGELOG.md",
+    "COVERAGE.md",
 ]
 
 [lints.rust]

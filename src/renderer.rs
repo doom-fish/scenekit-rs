@@ -69,7 +69,7 @@ impl Renderer {
             ffi::scn_renderer_set_scene(
                 self.ptr,
                 scene.map_or(core::ptr::null_mut(), Scene::as_ptr),
-            )
+            );
         };
     }
 

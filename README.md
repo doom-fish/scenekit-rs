@@ -2,7 +2,7 @@
 
 Safe Rust bindings for Apple's [SceneKit](https://developer.apple.com/documentation/scenekit) framework on macOS.
 
-> **Status:** v0.1.0 covers core scene construction, transformable nodes, primitive geometry, materials and material properties, cameras, lights, actions, physics bodies, and offline rendering through `SCNRenderer` into Metal textures.
+> **Status:** v0.2.0 adds dedicated Swift bridge files, Rust modules, examples, and tests for `SCNScene`, `SCNNode`, `SCNCamera`, `SCNLight`, `SCNGeometry`, `SCNMaterial`, `SCNAnimation`, `SCNPhysics`, `SCNView`, `SCNRenderer`, `SCNAction`, `SCNTransaction`, `SCNConstraint`, `SCNParticleSystem`, `SCNAudioPlayer`, `SCNHitTest`, and `SCNTechnique`.
 
 ## Quick start
 
@@ -69,22 +69,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Highlights
 
-- `Scene::new`, `Scene::named`, `Scene::from_url`
-- `Node` transforms, hierarchy management, attached geometry / light / camera / physics
-- Primitive `Geometry` constructors plus `Geometry::from_mdl_mesh_raw`
-- `Material` + `MaterialProperty` with color, file URL, `CGImage`, and `MTLTexture` contents
-- `Camera`, `Light`, `PhysicsBody`, and `Action` wrappers
-- `Renderer` + `RenderPassDescriptor` for offline `SceneKit` rendering into `apple-metal` textures
+- Scene graph construction with `Scene`, `Node`, `Camera`, `Light`, `Geometry`, and `Material`
+- Animation and action playback through `Animation`, `AnimationPlayer`, and `Action`
+- Physics, constraints, particles, and audio attachment helpers on `Node`
+- Headless-safe `View` snapshots, `HitTest` helpers, and minimal `Technique` support
+- `Transaction` helpers for implicit animation scopes
+- Offline `Renderer` + `RenderPassDescriptor` integration for `apple-metal`
 
-## Smoke example
+## Examples and tests
 
-Run the offline render smoke test with:
+The crate ships with 17 numbered examples and 17 integration test files. To run the full verification suite:
+
+```bash
+cargo clippy --all-targets -- -D warnings
+cargo test
+for ex in examples/*.rs; do cargo run --example "$(basename "$ex" .rs)"; done
+```
+
+The original offline render smoke test is still available as:
 
 ```bash
 cargo run --example 01_offline_render_smoke
 ```
-
-It creates a small scene, renders a cube into a Metal texture via `SCNRenderer`, reads the bytes back, and prints a success banner once non-zero pixel data is observed.
 
 ## License
 

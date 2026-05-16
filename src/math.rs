@@ -21,6 +21,11 @@ impl Vector3 {
     pub const fn as_ptr(&self) -> *const f32 {
         &self.x
     }
+
+    #[must_use]
+    pub fn as_mut_ptr(&mut self) -> *mut f32 {
+        &mut self.x
+    }
 }
 
 #[repr(C)]
@@ -41,6 +46,11 @@ impl Vector4 {
     #[must_use]
     pub const fn as_ptr(&self) -> *const f32 {
         &self.x
+    }
+
+    #[must_use]
+    pub fn as_mut_ptr(&mut self) -> *mut f32 {
+        &mut self.x
     }
 }
 

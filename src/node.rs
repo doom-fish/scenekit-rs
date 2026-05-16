@@ -175,19 +175,3 @@ impl Node {
         unsafe { ffi::scn_node_run_action(self.ptr, action.as_ptr()) };
     }
 }
-
-trait RawMutPtr<T> {
-    fn as_mut_ptr(&mut self) -> *mut T;
-}
-
-impl RawMutPtr<f32> for Vector3 {
-    fn as_mut_ptr(&mut self) -> *mut f32 {
-        &mut self.x
-    }
-}
-
-impl RawMutPtr<f32> for Vector4 {
-    fn as_mut_ptr(&mut self) -> *mut f32 {
-        &mut self.x
-    }
-}
