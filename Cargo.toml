@@ -1,0 +1,61 @@
+[package]
+name = "scenekit-rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/doom-fish/scenekit-rs"
+repository = "https://github.com/doom-fish/scenekit-rs"
+description = "Safe Rust bindings for Apple's SceneKit framework — scene graphs, materials, actions, physics, and offline Metal rendering on macOS"
+authors = ["Per Johansson <per@doom.fish>"]
+keywords = ["scenekit", "3d", "metal", "macos", "apple"]
+categories = ["api-bindings", "graphics", "os::macos-apis"]
+rust-version = "1.76"
+readme = "README.md"
+build = "build.rs"
+include = [
+    "src/**/*",
+    "examples/**/*",
+    "swift-bridge/Package.swift",
+    "swift-bridge/Sources/**/*",
+    "build.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE-*",
+    "CHANGELOG.md",
+]
+
+[lints.rust]
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+
+[lib]
+name = "scenekit"
+crate-type = ["lib"]
+
+[features]
+default = []
+cargo-clippy = []
+
+[dependencies]
+libc = "0.2"
+apple-metal = { path = "../apple-metal-rs", version = ">=0.5.0, <0.6" }
+apple-cf = { path = "../apple-cf-rs", version = ">=0.4.0, <0.6" }
+
+[package.metadata.docs.rs]
+all-features = true
+default-target = "aarch64-apple-darwin"
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
+rustdoc-args = ["--cfg", "docsrs"]
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[[example]]
+name = "01_offline_render_smoke"
+
+[profile.release]
+debug = "full"
+strip = "none"

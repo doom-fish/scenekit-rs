@@ -1,0 +1,4 @@
+module SceneKitBridge [system] {
+    header "SceneKitBridge.h"
+    export *
+}

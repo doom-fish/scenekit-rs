@@ -1,0 +1,3 @@
+#ifndef SCENEKIT_BRIDGE_H
+#define SCENEKIT_BRIDGE_H
+#endif
