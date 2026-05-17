@@ -187,12 +187,22 @@ impl Shape {
 impl GeometrySource {
     #[must_use]
     pub fn with_vertices(vertices: &[Vector3]) -> Option<Self> {
-        unsafe { Self::from_raw(scn_geometry_source_new_vertices(vertices.as_ptr().cast(), vertices.len())) }
+        unsafe {
+            Self::from_raw(scn_geometry_source_new_vertices(
+                vertices.as_ptr().cast(),
+                vertices.len(),
+            ))
+        }
     }
 
     #[must_use]
     pub fn with_normals(normals: &[Vector3]) -> Option<Self> {
-        unsafe { Self::from_raw(scn_geometry_source_new_normals(normals.as_ptr().cast(), normals.len())) }
+        unsafe {
+            Self::from_raw(scn_geometry_source_new_normals(
+                normals.as_ptr().cast(),
+                normals.len(),
+            ))
+        }
     }
 
     #[must_use]
@@ -232,8 +242,10 @@ impl Geometry {
         sources: &[&GeometrySource],
         elements: &[&GeometryElement],
     ) -> Option<Self> {
-        let mut source_ptrs: Vec<*mut c_void> = sources.iter().map(|source| source.as_ptr()).collect();
-        let mut element_ptrs: Vec<*mut c_void> = elements.iter().map(|element| element.as_ptr()).collect();
+        let mut source_ptrs: Vec<*mut c_void> =
+            sources.iter().map(|source| source.as_ptr()).collect();
+        let mut element_ptrs: Vec<*mut c_void> =
+            elements.iter().map(|element| element.as_ptr()).collect();
         unsafe {
             Self::from_raw(scn_geometry_new_with_sources_elements(
                 if source_ptrs.is_empty() {
@@ -341,7 +353,11 @@ impl Morpher {
 impl ParticlePropertyController {
     #[must_use]
     pub fn with_animation(animation: &Animation) -> Option<Self> {
-        unsafe { Self::from_raw(scn_particle_property_controller_new_with_animation(animation.as_ptr())) }
+        unsafe {
+            Self::from_raw(scn_particle_property_controller_new_with_animation(
+                animation.as_ptr(),
+            ))
+        }
     }
 
     #[must_use]
@@ -354,7 +370,9 @@ impl ParticlePropertyController {
     }
 
     pub fn set_input_mode(&self, input_mode: ParticleInputMode) {
-        unsafe { scn_particle_property_controller_set_input_mode(self.as_ptr(), input_mode as i32) };
+        unsafe {
+            scn_particle_property_controller_set_input_mode(self.as_ptr(), input_mode as i32)
+        };
     }
 }
 

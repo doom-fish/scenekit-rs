@@ -41,9 +41,17 @@ extern "C" {
     fn scn_scene_export_delegate_new(
         context: *mut c_void,
         release_context: extern "C" fn(*mut c_void),
-        write_image_callback: extern "C" fn(*mut c_void, *const c_char, *const c_char) -> *const c_char,
+        write_image_callback: extern "C" fn(
+            *mut c_void,
+            *const c_char,
+            *const c_char,
+        ) -> *const c_char,
     ) -> *mut c_void;
-    fn scn_scene_write_to_url(scene: *mut c_void, path: *const c_char, delegate: *mut c_void) -> bool;
+    fn scn_scene_write_to_url(
+        scene: *mut c_void,
+        path: *const c_char,
+        delegate: *mut c_void,
+    ) -> bool;
 
     fn scn_export_javascript_module(context: *mut c_void);
 }
@@ -99,7 +107,9 @@ impl Drop for NodeRendererDelegate {
     }
 }
 
-unsafe fn node_renderer_state_from_context<'a>(context: *mut c_void) -> &'a mut NodeRendererDelegateState {
+unsafe fn node_renderer_state_from_context<'a>(
+    context: *mut c_void,
+) -> &'a mut NodeRendererDelegateState {
     &mut *context.cast::<NodeRendererDelegateState>()
 }
 
@@ -112,7 +122,11 @@ extern "C" fn release_node_renderer_context(context: *mut c_void) {
     }
 }
 
-extern "C" fn node_renderer_trampoline(context: *mut c_void, node: *mut c_void, renderer: *mut c_void) {
+extern "C" fn node_renderer_trampoline(
+    context: *mut c_void,
+    node: *mut c_void,
+    renderer: *mut c_void,
+) {
     if context.is_null() || node.is_null() || renderer.is_null() {
         return;
     }
@@ -130,7 +144,11 @@ impl NodeRendererDelegate {
         let state = Box::new(NodeRendererDelegateState { callbacks });
         let context = Box::into_raw(state).cast::<c_void>();
         let ptr = unsafe {
-            scn_node_renderer_delegate_new(context, release_node_renderer_context, node_renderer_trampoline)
+            scn_node_renderer_delegate_new(
+                context,
+                release_node_renderer_context,
+                node_renderer_trampoline,
+            )
         };
         if ptr.is_null() {
             release_node_renderer_context(context);
@@ -205,7 +223,9 @@ impl Drop for AvoidOccluderConstraintDelegate {
     }
 }
 
-unsafe fn avoid_occluder_state_from_context<'a>(context: *mut c_void) -> &'a mut AvoidOccluderConstraintDelegateState {
+unsafe fn avoid_occluder_state_from_context<'a>(
+    context: *mut c_void,
+) -> &'a mut AvoidOccluderConstraintDelegateState {
     &mut *context.cast::<AvoidOccluderConstraintDelegateState>()
 }
 
@@ -214,11 +234,17 @@ extern "C" fn release_avoid_occluder_context(context: *mut c_void) {
         return;
     }
     unsafe {
-        drop(Box::from_raw(context.cast::<AvoidOccluderConstraintDelegateState>()));
+        drop(Box::from_raw(
+            context.cast::<AvoidOccluderConstraintDelegateState>(),
+        ));
     }
 }
 
-extern "C" fn avoid_occluder_should_trampoline(context: *mut c_void, occluder: *mut c_void, node: *mut c_void) -> bool {
+extern "C" fn avoid_occluder_should_trampoline(
+    context: *mut c_void,
+    occluder: *mut c_void,
+    node: *mut c_void,
+) -> bool {
     if context.is_null() || occluder.is_null() || node.is_null() {
         return true;
     }
@@ -234,7 +260,11 @@ extern "C" fn avoid_occluder_should_trampoline(context: *mut c_void, occluder: *
         })
 }
 
-extern "C" fn avoid_occluder_did_trampoline(context: *mut c_void, occluder: *mut c_void, node: *mut c_void) {
+extern "C" fn avoid_occluder_did_trampoline(
+    context: *mut c_void,
+    occluder: *mut c_void,
+    node: *mut c_void,
+) {
     if context.is_null() || occluder.is_null() || node.is_null() {
         return;
     }
@@ -299,7 +329,9 @@ impl Drop for SceneExportDelegate {
     }
 }
 
-unsafe fn scene_export_state_from_context<'a>(context: *mut c_void) -> &'a mut SceneExportDelegateState {
+unsafe fn scene_export_state_from_context<'a>(
+    context: *mut c_void,
+) -> &'a mut SceneExportDelegateState {
     &mut *context.cast::<SceneExportDelegateState>()
 }
 
@@ -381,7 +413,12 @@ impl Node {
 
     #[must_use]
     pub fn renderer_delegate(&self) -> Option<NodeRendererDelegate> {
-        unsafe { Some(NodeRendererDelegate { ptr: scn_node_get_renderer_delegate(self.as_ptr()) }).filter(|d| !d.ptr.is_null()) }
+        unsafe {
+            Some(NodeRendererDelegate {
+                ptr: scn_node_get_renderer_delegate(self.as_ptr()),
+            })
+            .filter(|d| !d.ptr.is_null())
+        }
     }
 
     pub fn test_invoke_renderer_delegate(&self, renderer: &Renderer) {
@@ -401,22 +438,43 @@ impl AvoidOccluderConstraint {
 
     #[must_use]
     pub fn delegate(&self) -> Option<AvoidOccluderConstraintDelegate> {
-        unsafe { Some(AvoidOccluderConstraintDelegate { ptr: scn_avoid_occluder_constraint_get_delegate(self.as_ptr()) }).filter(|d| !d.ptr.is_null()) }
+        unsafe {
+            Some(AvoidOccluderConstraintDelegate {
+                ptr: scn_avoid_occluder_constraint_get_delegate(self.as_ptr()),
+            })
+            .filter(|d| !d.ptr.is_null())
+        }
     }
 
     #[must_use]
     pub fn test_invoke_should_avoid_occluder(&self, occluder: &Node, node: &Node) -> bool {
-        unsafe { scn_avoid_occluder_constraint_test_invoke_should(self.as_ptr(), occluder.as_ptr(), node.as_ptr()) }
+        unsafe {
+            scn_avoid_occluder_constraint_test_invoke_should(
+                self.as_ptr(),
+                occluder.as_ptr(),
+                node.as_ptr(),
+            )
+        }
     }
 
     pub fn test_invoke_did_avoid_occluder(&self, occluder: &Node, node: &Node) {
-        unsafe { scn_avoid_occluder_constraint_test_invoke_did(self.as_ptr(), occluder.as_ptr(), node.as_ptr()) };
+        unsafe {
+            scn_avoid_occluder_constraint_test_invoke_did(
+                self.as_ptr(),
+                occluder.as_ptr(),
+                node.as_ptr(),
+            )
+        };
     }
 }
 
 impl Scene {
     #[must_use]
-    pub fn write_to_url(&self, path: impl AsRef<Path>, delegate: Option<&SceneExportDelegate>) -> bool {
+    pub fn write_to_url(
+        &self,
+        path: impl AsRef<Path>,
+        delegate: Option<&SceneExportDelegate>,
+    ) -> bool {
         let Some(path) = cstring_from_path(path.as_ref()) else {
             return false;
         };

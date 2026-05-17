@@ -44,14 +44,22 @@ fn test_extended_scene_renderer_surface() {
         ],
     ));
 
-    let projected = SceneRenderer::project_point(&view, Vector3::new(0.0, 0.0, 0.0)).expect("project");
+    let projected =
+        SceneRenderer::project_point(&view, Vector3::new(0.0, 0.0, 0.0)).expect("project");
     let unprojected = SceneRenderer::unproject_point(&view, projected).expect("unproject");
     assert!(unprojected.z.is_finite());
 
-    let hits = SceneRenderer::hit_test(&view, scenekit::CGPoint::new(projected.x.into(), projected.y.into()))
-        .expect("hit test");
+    let hits = SceneRenderer::hit_test(
+        &view,
+        scenekit::CGPoint::new(projected.x.into(), projected.y.into()),
+    )
+    .expect("hit test");
     let _ = hits.count();
-    assert!(SceneRenderer::is_node_inside_frustum(&view, &cube_node, &camera_node));
+    assert!(SceneRenderer::is_node_inside_frustum(
+        &view,
+        &cube_node,
+        &camera_node
+    ));
     assert!(!SceneRenderer::nodes_inside_frustum(&view, &camera_node).is_empty());
 
     SceneRenderer::set_current_time(&view, 0.75);
@@ -90,12 +98,10 @@ fn test_node_renderer_delegate_bridge() {
     let node = Node::new().expect("node");
     let calls = Rc::new(RefCell::new(0usize));
 
-    let delegate = NodeRendererDelegate::new(
-        NodeRendererDelegateCallbacks::new().on_render({
-            let calls = Rc::clone(&calls);
-            move |_, _| *calls.borrow_mut() += 1
-        }),
-    )
+    let delegate = NodeRendererDelegate::new(NodeRendererDelegateCallbacks::new().on_render({
+        let calls = Rc::clone(&calls);
+        move |_, _| *calls.borrow_mut() += 1
+    }))
     .expect("node renderer delegate");
 
     node.set_renderer_delegate(Some(&delegate));
@@ -149,10 +155,9 @@ fn test_scene_export_and_extended_physics_surface() {
         fs::remove_file(&export_path).expect("remove stale export");
     }
 
-    let export_delegate = SceneExportDelegate::new(|document_url, _original_image_url| {
-        Some(document_url.to_owned())
-    })
-    .expect("scene export delegate");
+    let export_delegate =
+        SceneExportDelegate::new(|document_url, _original_image_url| Some(document_url.to_owned()))
+            .expect("scene export delegate");
     assert!(scene.write_to_url(&export_path, Some(&export_delegate)));
     assert!(export_path.exists());
     fs::remove_file(&export_path).expect("cleanup export");
@@ -183,6 +188,10 @@ fn test_scene_export_and_extended_physics_surface() {
 
     let joint_anchor = Vector3::new(0.0, 0.0, 0.0);
     assert!(PhysicsBallSocketJoint::with_anchor(&body, joint_anchor).is_some());
-    assert!(PhysicsHingeJoint::with_anchor(&body, Vector3::new(0.0, 1.0, 0.0), joint_anchor).is_some());
-    assert!(PhysicsSliderJoint::with_anchor(&body, Vector3::new(1.0, 0.0, 0.0), joint_anchor).is_some());
+    assert!(
+        PhysicsHingeJoint::with_anchor(&body, Vector3::new(0.0, 1.0, 0.0), joint_anchor).is_some()
+    );
+    assert!(
+        PhysicsSliderJoint::with_anchor(&body, Vector3::new(1.0, 0.0, 0.0), joint_anchor).is_some()
+    );
 }

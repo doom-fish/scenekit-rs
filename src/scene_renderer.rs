@@ -64,7 +64,10 @@ extern "C" {
     fn scn_scene_renderer_get_audio_environment_node(renderer: *mut c_void) -> *mut c_void;
     fn scn_scene_renderer_get_audio_listener(renderer: *mut c_void) -> *mut c_void;
     fn scn_scene_renderer_set_audio_listener(renderer: *mut c_void, listener: *mut c_void);
-    fn scn_scene_renderer_get_current_viewport(renderer: *mut c_void, out_rect: *mut c_void) -> bool;
+    fn scn_scene_renderer_get_current_viewport(
+        renderer: *mut c_void,
+        out_rect: *mut c_void,
+    ) -> bool;
     fn scn_scene_renderer_get_current_time(renderer: *mut c_void) -> f64;
     fn scn_scene_renderer_set_current_time(renderer: *mut c_void, value: f64);
     fn scn_scene_renderer_get_uses_reverse_z(renderer: *mut c_void) -> bool;
@@ -510,7 +513,13 @@ pub trait SceneRenderer: Sealed {
 
     #[must_use]
     fn hit_test(&self, point: crate::CGPoint) -> Option<HitTestResults> {
-        unsafe { HitTestResults::from_raw(scn_scene_renderer_hit_test(self.scene_renderer_ptr(), point.x, point.y)) }
+        unsafe {
+            HitTestResults::from_raw(scn_scene_renderer_hit_test(
+                self.scene_renderer_ptr(),
+                point.x,
+                point.y,
+            ))
+        }
     }
 
     #[must_use]
@@ -676,7 +685,12 @@ pub trait SceneRenderer: Sealed {
 
     #[must_use]
     fn prepare_object(&self, object: &dyn Prepareable) -> bool {
-        unsafe { scn_scene_renderer_prepare_object(self.scene_renderer_ptr(), object.as_prepareable_ptr()) }
+        unsafe {
+            scn_scene_renderer_prepare_object(
+                self.scene_renderer_ptr(),
+                object.as_prepareable_ptr(),
+            )
+        }
     }
 
     #[must_use]
@@ -700,7 +714,11 @@ pub trait SceneRenderer: Sealed {
 
     #[must_use]
     fn overlay_scene(&self) -> Option<SpriteScene> {
-        unsafe { SpriteScene::from_raw(scn_scene_renderer_get_overlay_sk_scene(self.scene_renderer_ptr())) }
+        unsafe {
+            SpriteScene::from_raw(scn_scene_renderer_get_overlay_sk_scene(
+                self.scene_renderer_ptr(),
+            ))
+        }
     }
 
     fn set_overlay_scene(&self, scene: Option<&SpriteScene>) {
@@ -721,9 +739,9 @@ pub trait SceneRenderer: Sealed {
     #[must_use]
     fn current_render_command_encoder(&self) -> Option<MetalRenderCommandEncoder> {
         unsafe {
-            MetalRenderCommandEncoder::from_raw(scn_scene_renderer_get_current_render_command_encoder(
-                self.scene_renderer_ptr(),
-            ))
+            MetalRenderCommandEncoder::from_raw(
+                scn_scene_renderer_get_current_render_command_encoder(self.scene_renderer_ptr()),
+            )
         }
     }
 
@@ -738,7 +756,9 @@ pub trait SceneRenderer: Sealed {
 
     #[must_use]
     fn device(&self) -> Option<MetalDeviceHandle> {
-        unsafe { MetalDeviceHandle::from_raw(scn_scene_renderer_get_device(self.scene_renderer_ptr())) }
+        unsafe {
+            MetalDeviceHandle::from_raw(scn_scene_renderer_get_device(self.scene_renderer_ptr()))
+        }
     }
 
     #[must_use]
@@ -758,12 +778,20 @@ pub trait SceneRenderer: Sealed {
 
     #[must_use]
     fn command_queue(&self) -> Option<MetalCommandQueue> {
-        unsafe { MetalCommandQueue::from_raw(scn_scene_renderer_get_command_queue(self.scene_renderer_ptr())) }
+        unsafe {
+            MetalCommandQueue::from_raw(scn_scene_renderer_get_command_queue(
+                self.scene_renderer_ptr(),
+            ))
+        }
     }
 
     #[must_use]
     fn audio_engine(&self) -> Option<AudioEngine> {
-        unsafe { AudioEngine::from_raw(scn_scene_renderer_get_audio_engine(self.scene_renderer_ptr())) }
+        unsafe {
+            AudioEngine::from_raw(scn_scene_renderer_get_audio_engine(
+                self.scene_renderer_ptr(),
+            ))
+        }
     }
 
     #[must_use]
@@ -777,7 +805,11 @@ pub trait SceneRenderer: Sealed {
 
     #[must_use]
     fn audio_listener(&self) -> Option<Node> {
-        unsafe { Node::from_raw(scn_scene_renderer_get_audio_listener(self.scene_renderer_ptr())) }
+        unsafe {
+            Node::from_raw(scn_scene_renderer_get_audio_listener(
+                self.scene_renderer_ptr(),
+            ))
+        }
     }
 
     fn set_audio_listener(&self, listener: Option<&Node>) {

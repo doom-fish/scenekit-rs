@@ -33,7 +33,10 @@ extern "C" {
         body_b: *mut c_void,
         anchor_b: *mut c_void,
     ) -> *mut c_void;
-    fn scn_physics_ball_socket_joint_new_single(body: *mut c_void, anchor: *mut c_void) -> *mut c_void;
+    fn scn_physics_ball_socket_joint_new_single(
+        body: *mut c_void,
+        anchor: *mut c_void,
+    ) -> *mut c_void;
 
     fn scn_physics_hinge_joint_new(
         body_a: *mut c_void,
@@ -69,7 +72,10 @@ extern "C" {
         body_b: *mut c_void,
         frame_b: *mut c_void,
     ) -> *mut c_void;
-    fn scn_physics_cone_twist_joint_new_single(body: *mut c_void, frame: *mut c_void) -> *mut c_void;
+    fn scn_physics_cone_twist_joint_new_single(
+        body: *mut c_void,
+        frame: *mut c_void,
+    ) -> *mut c_void;
 
     fn scn_physics_vehicle_wheel_new(node: *mut c_void) -> *mut c_void;
     fn scn_physics_vehicle_new(
@@ -80,7 +86,11 @@ extern "C" {
     fn scn_physics_vehicle_get_speed_in_kilometers_per_hour(vehicle: *mut c_void) -> f64;
     fn scn_physics_vehicle_apply_engine_force(vehicle: *mut c_void, value: f64, wheel_index: usize);
     fn scn_physics_vehicle_set_steering_angle(vehicle: *mut c_void, value: f64, wheel_index: usize);
-    fn scn_physics_vehicle_apply_braking_force(vehicle: *mut c_void, value: f64, wheel_index: usize);
+    fn scn_physics_vehicle_apply_braking_force(
+        vehicle: *mut c_void,
+        value: f64,
+        wheel_index: usize,
+    );
 }
 
 use crate::geometry::Geometry;
@@ -224,7 +234,12 @@ impl Node {
 
 impl PhysicsBallSocketJoint {
     #[must_use]
-    pub fn new(body_a: &PhysicsBody, anchor_a: Vector3, body_b: &PhysicsBody, anchor_b: Vector3) -> Option<Self> {
+    pub fn new(
+        body_a: &PhysicsBody,
+        anchor_a: Vector3,
+        body_b: &PhysicsBody,
+        anchor_b: Vector3,
+    ) -> Option<Self> {
         let mut anchor_a = anchor_a;
         let mut anchor_b = anchor_b;
         unsafe {
@@ -240,7 +255,12 @@ impl PhysicsBallSocketJoint {
     #[must_use]
     pub fn with_anchor(body: &PhysicsBody, anchor: Vector3) -> Option<Self> {
         let mut anchor = anchor;
-        unsafe { Self::from_raw(scn_physics_ball_socket_joint_new_single(body.as_ptr(), anchor.as_mut_ptr().cast())) }
+        unsafe {
+            Self::from_raw(scn_physics_ball_socket_joint_new_single(
+                body.as_ptr(),
+                anchor.as_mut_ptr().cast(),
+            ))
+        }
     }
 }
 
@@ -326,7 +346,12 @@ impl PhysicsSliderJoint {
 
 impl PhysicsConeTwistJoint {
     #[must_use]
-    pub fn new(body_a: &PhysicsBody, frame_a: Matrix4, body_b: &PhysicsBody, frame_b: Matrix4) -> Option<Self> {
+    pub fn new(
+        body_a: &PhysicsBody,
+        frame_a: Matrix4,
+        body_b: &PhysicsBody,
+        frame_b: Matrix4,
+    ) -> Option<Self> {
         let mut frame_a = frame_a;
         let mut frame_b = frame_b;
         unsafe {
@@ -342,7 +367,12 @@ impl PhysicsConeTwistJoint {
     #[must_use]
     pub fn with_frame(body: &PhysicsBody, frame: Matrix4) -> Option<Self> {
         let mut frame = frame;
-        unsafe { Self::from_raw(scn_physics_cone_twist_joint_new_single(body.as_ptr(), frame.as_mut_ptr().cast())) }
+        unsafe {
+            Self::from_raw(scn_physics_cone_twist_joint_new_single(
+                body.as_ptr(),
+                frame.as_mut_ptr().cast(),
+            ))
+        }
     }
 }
 

@@ -33,10 +33,7 @@ extern "C" {
         z: f32,
         out_matrix: *mut core::ffi::c_void,
     );
-    fn scn_extra_matrix4_invert(
-        matrix: *mut core::ffi::c_void,
-        out_matrix: *mut core::ffi::c_void,
-    );
+    fn scn_extra_matrix4_invert(matrix: *mut core::ffi::c_void, out_matrix: *mut core::ffi::c_void);
     fn scn_extra_matrix4_mult(
         a: *mut core::ffi::c_void,
         b: *mut core::ffi::c_void,
@@ -452,7 +449,13 @@ pub fn matrix4_scale(matrix: Matrix4, sx: f32, sy: f32, sz: f32) -> Matrix4 {
     let mut matrix = matrix;
     let mut out = Matrix4::default();
     unsafe {
-        scn_extra_matrix4_scale(matrix.as_mut_ptr().cast(), sx, sy, sz, out.as_mut_ptr().cast());
+        scn_extra_matrix4_scale(
+            matrix.as_mut_ptr().cast(),
+            sx,
+            sy,
+            sz,
+            out.as_mut_ptr().cast(),
+        );
     }
     out
 }
@@ -487,7 +490,13 @@ pub fn matrix4_mult(a: Matrix4, b: Matrix4) -> Matrix4 {
     let mut a = a;
     let mut b = b;
     let mut out = Matrix4::default();
-    unsafe { scn_extra_matrix4_mult(a.as_mut_ptr().cast(), b.as_mut_ptr().cast(), out.as_mut_ptr().cast()) };
+    unsafe {
+        scn_extra_matrix4_mult(
+            a.as_mut_ptr().cast(),
+            b.as_mut_ptr().cast(),
+            out.as_mut_ptr().cast(),
+        )
+    };
     out
 }
 
@@ -507,23 +516,68 @@ pub fn matrix4_from_glk(glk: GlkMatrix4) -> Matrix4 {
 }
 
 string_constant_fn!(error_domain, "SCNErrorDomain");
-string_constant_fn!(geometry_source_semantic_bone_indices, "SCNGeometrySourceSemanticBoneIndices");
-string_constant_fn!(geometry_source_semantic_bone_weights, "SCNGeometrySourceSemanticBoneWeights");
-string_constant_fn!(geometry_source_semantic_color, "SCNGeometrySourceSemanticColor");
-string_constant_fn!(geometry_source_semantic_edge_crease, "SCNGeometrySourceSemanticEdgeCrease");
-string_constant_fn!(geometry_source_semantic_normal, "SCNGeometrySourceSemanticNormal");
-string_constant_fn!(geometry_source_semantic_tangent, "SCNGeometrySourceSemanticTangent");
-string_constant_fn!(geometry_source_semantic_texcoord, "SCNGeometrySourceSemanticTexcoord");
-string_constant_fn!(geometry_source_semantic_vertex, "SCNGeometrySourceSemanticVertex");
-string_constant_fn!(geometry_source_semantic_vertex_crease, "SCNGeometrySourceSemanticVertexCrease");
-string_constant_fn!(hit_test_back_face_culling_key, "SCNHitTestBackFaceCullingKey");
-string_constant_fn!(hit_test_bounding_box_only_key, "SCNHitTestBoundingBoxOnlyKey");
+string_constant_fn!(
+    geometry_source_semantic_bone_indices,
+    "SCNGeometrySourceSemanticBoneIndices"
+);
+string_constant_fn!(
+    geometry_source_semantic_bone_weights,
+    "SCNGeometrySourceSemanticBoneWeights"
+);
+string_constant_fn!(
+    geometry_source_semantic_color,
+    "SCNGeometrySourceSemanticColor"
+);
+string_constant_fn!(
+    geometry_source_semantic_edge_crease,
+    "SCNGeometrySourceSemanticEdgeCrease"
+);
+string_constant_fn!(
+    geometry_source_semantic_normal,
+    "SCNGeometrySourceSemanticNormal"
+);
+string_constant_fn!(
+    geometry_source_semantic_tangent,
+    "SCNGeometrySourceSemanticTangent"
+);
+string_constant_fn!(
+    geometry_source_semantic_texcoord,
+    "SCNGeometrySourceSemanticTexcoord"
+);
+string_constant_fn!(
+    geometry_source_semantic_vertex,
+    "SCNGeometrySourceSemanticVertex"
+);
+string_constant_fn!(
+    geometry_source_semantic_vertex_crease,
+    "SCNGeometrySourceSemanticVertexCrease"
+);
+string_constant_fn!(
+    hit_test_back_face_culling_key,
+    "SCNHitTestBackFaceCullingKey"
+);
+string_constant_fn!(
+    hit_test_bounding_box_only_key,
+    "SCNHitTestBoundingBoxOnlyKey"
+);
 string_constant_fn!(hit_test_clip_to_z_range_key, "SCNHitTestClipToZRangeKey");
 string_constant_fn!(hit_test_first_found_only_key, "SCNHitTestFirstFoundOnlyKey");
-string_constant_fn!(hit_test_ignore_child_nodes_key, "SCNHitTestIgnoreChildNodesKey");
-string_constant_fn!(hit_test_ignore_hidden_nodes_key, "SCNHitTestIgnoreHiddenNodesKey");
-string_constant_fn!(hit_test_option_category_bit_mask, "SCNHitTestOptionCategoryBitMask");
-string_constant_fn!(hit_test_option_ignore_light_area, "SCNHitTestOptionIgnoreLightArea");
+string_constant_fn!(
+    hit_test_ignore_child_nodes_key,
+    "SCNHitTestIgnoreChildNodesKey"
+);
+string_constant_fn!(
+    hit_test_ignore_hidden_nodes_key,
+    "SCNHitTestIgnoreHiddenNodesKey"
+);
+string_constant_fn!(
+    hit_test_option_category_bit_mask,
+    "SCNHitTestOptionCategoryBitMask"
+);
+string_constant_fn!(
+    hit_test_option_ignore_light_area,
+    "SCNHitTestOptionIgnoreLightArea"
+);
 string_constant_fn!(hit_test_option_search_mode, "SCNHitTestOptionSearchMode");
 string_constant_fn!(hit_test_root_node_key, "SCNHitTestRootNodeKey");
 string_constant_fn!(hit_test_sort_results_key, "SCNHitTestSortResultsKey");
@@ -531,42 +585,81 @@ string_constant_fn!(lighting_model_blinn, "SCNLightingModelBlinn");
 string_constant_fn!(lighting_model_constant, "SCNLightingModelConstant");
 string_constant_fn!(lighting_model_lambert, "SCNLightingModelLambert");
 string_constant_fn!(lighting_model_phong, "SCNLightingModelPhong");
-string_constant_fn!(lighting_model_physically_based, "SCNLightingModelPhysicallyBased");
+string_constant_fn!(
+    lighting_model_physically_based,
+    "SCNLightingModelPhysicallyBased"
+);
 string_constant_fn!(lighting_model_shadow_only, "SCNLightingModelShadowOnly");
 string_constant_fn!(model_transform, "SCNModelTransform");
-string_constant_fn!(model_view_projection_transform, "SCNModelViewProjectionTransform");
+string_constant_fn!(
+    model_view_projection_transform,
+    "SCNModelViewProjectionTransform"
+);
 string_constant_fn!(model_view_transform, "SCNModelViewTransform");
 string_constant_fn!(normal_transform, "SCNNormalTransform");
 string_constant_fn!(projection_transform, "SCNProjectionTransform");
 string_constant_fn!(view_transform, "SCNViewTransform");
 string_constant_fn!(particle_property_angle, "SCNParticlePropertyAngle");
-string_constant_fn!(particle_property_angular_velocity, "SCNParticlePropertyAngularVelocity");
+string_constant_fn!(
+    particle_property_angular_velocity,
+    "SCNParticlePropertyAngularVelocity"
+);
 string_constant_fn!(particle_property_bounce, "SCNParticlePropertyBounce");
 string_constant_fn!(particle_property_charge, "SCNParticlePropertyCharge");
 string_constant_fn!(particle_property_color, "SCNParticlePropertyColor");
-string_constant_fn!(particle_property_contact_normal, "SCNParticlePropertyContactNormal");
-string_constant_fn!(particle_property_contact_point, "SCNParticlePropertyContactPoint");
+string_constant_fn!(
+    particle_property_contact_normal,
+    "SCNParticlePropertyContactNormal"
+);
+string_constant_fn!(
+    particle_property_contact_point,
+    "SCNParticlePropertyContactPoint"
+);
 string_constant_fn!(particle_property_frame, "SCNParticlePropertyFrame");
 string_constant_fn!(particle_property_frame_rate, "SCNParticlePropertyFrameRate");
 string_constant_fn!(particle_property_friction, "SCNParticlePropertyFriction");
 string_constant_fn!(particle_property_life, "SCNParticlePropertyLife");
 string_constant_fn!(particle_property_opacity, "SCNParticlePropertyOpacity");
 string_constant_fn!(particle_property_position, "SCNParticlePropertyPosition");
-string_constant_fn!(particle_property_rotation_axis, "SCNParticlePropertyRotationAxis");
+string_constant_fn!(
+    particle_property_rotation_axis,
+    "SCNParticlePropertyRotationAxis"
+);
 string_constant_fn!(particle_property_size, "SCNParticlePropertySize");
 string_constant_fn!(particle_property_velocity, "SCNParticlePropertyVelocity");
-string_constant_fn!(physics_shape_keep_as_compound_key, "SCNPhysicsShapeKeepAsCompoundKey");
-string_constant_fn!(physics_shape_option_collision_margin, "SCNPhysicsShapeOptionCollisionMargin");
+string_constant_fn!(
+    physics_shape_keep_as_compound_key,
+    "SCNPhysicsShapeKeepAsCompoundKey"
+);
+string_constant_fn!(
+    physics_shape_option_collision_margin,
+    "SCNPhysicsShapeOptionCollisionMargin"
+);
 string_constant_fn!(physics_shape_scale_key, "SCNPhysicsShapeScaleKey");
-string_constant_fn!(physics_shape_type_bounding_box, "SCNPhysicsShapeTypeBoundingBox");
-string_constant_fn!(physics_shape_type_concave_polyhedron, "SCNPhysicsShapeTypeConcavePolyhedron");
-string_constant_fn!(physics_shape_type_convex_hull, "SCNPhysicsShapeTypeConvexHull");
+string_constant_fn!(
+    physics_shape_type_bounding_box,
+    "SCNPhysicsShapeTypeBoundingBox"
+);
+string_constant_fn!(
+    physics_shape_type_concave_polyhedron,
+    "SCNPhysicsShapeTypeConcavePolyhedron"
+);
+string_constant_fn!(
+    physics_shape_type_convex_hull,
+    "SCNPhysicsShapeTypeConvexHull"
+);
 string_constant_fn!(physics_shape_type_key, "SCNPhysicsShapeTypeKey");
 string_constant_fn!(prefer_low_power_device_key, "SCNPreferLowPowerDeviceKey");
 string_constant_fn!(preferred_device_key, "SCNPreferredDeviceKey");
 string_constant_fn!(preferred_rendering_api_key, "SCNPreferredRenderingAPIKey");
 string_constant_fn!(scene_end_time_attribute_key, "SCNSceneEndTimeAttributeKey");
 string_constant_fn!(scene_export_destination_url, "SCNSceneExportDestinationURL");
-string_constant_fn!(scene_frame_rate_attribute_key, "SCNSceneFrameRateAttributeKey");
-string_constant_fn!(scene_start_time_attribute_key, "SCNSceneStartTimeAttributeKey");
+string_constant_fn!(
+    scene_frame_rate_attribute_key,
+    "SCNSceneFrameRateAttributeKey"
+);
+string_constant_fn!(
+    scene_start_time_attribute_key,
+    "SCNSceneStartTimeAttributeKey"
+);
 string_constant_fn!(scene_up_axis_attribute_key, "SCNSceneUpAxisAttributeKey");

@@ -97,7 +97,11 @@ pub trait Actionable: Sealed {
     fn run_action_for_key(&self, action: &Action, key: &str) {
         if let Some(key) = cstring_from_str(key) {
             unsafe {
-                scn_actionable_run_action_for_key(self.actionable_ptr(), action.as_ptr(), key.as_ptr());
+                scn_actionable_run_action_for_key(
+                    self.actionable_ptr(),
+                    action.as_ptr(),
+                    key.as_ptr(),
+                );
             };
         }
     }
@@ -110,7 +114,12 @@ pub trait Actionable: Sealed {
     #[must_use]
     fn action_for_key(&self, key: &str) -> Option<Action> {
         let key = cstring_from_str(key)?;
-        unsafe { Action::from_raw(scn_actionable_action_for_key(self.actionable_ptr(), key.as_ptr())) }
+        unsafe {
+            Action::from_raw(scn_actionable_action_for_key(
+                self.actionable_ptr(),
+                key.as_ptr(),
+            ))
+        }
     }
 
     fn remove_action_for_key(&self, key: &str) {
@@ -239,7 +248,11 @@ pub trait TechniqueSupport: Sealed {
 
     #[must_use]
     fn technique(&self) -> Option<Technique> {
-        unsafe { Technique::from_raw(scn_technique_support_get_technique(self.technique_support_ptr())) }
+        unsafe {
+            Technique::from_raw(scn_technique_support_get_technique(
+                self.technique_support_ptr(),
+            ))
+        }
     }
 
     fn set_technique(&self, technique: Option<&Technique>) {
@@ -265,7 +278,9 @@ struct AnimationEventState {
     callback: AnimationEventCallback,
 }
 
-unsafe fn animation_event_state_from_context<'a>(context: *mut c_void) -> &'a mut AnimationEventState {
+unsafe fn animation_event_state_from_context<'a>(
+    context: *mut c_void,
+) -> &'a mut AnimationEventState {
     &mut *context.cast::<AnimationEventState>()
 }
 

@@ -15,7 +15,10 @@ extern "C" {
     fn scn_transform_constraint_new_passthrough(world_space: bool) -> *mut c_void;
 
     fn scn_ik_constraint_new(chain_root_node: *mut c_void) -> *mut c_void;
-    fn scn_ik_constraint_get_target_position(constraint: *mut c_void, out_vector: *mut c_void) -> bool;
+    fn scn_ik_constraint_get_target_position(
+        constraint: *mut c_void,
+        out_vector: *mut c_void,
+    ) -> bool;
     fn scn_ik_constraint_set_target_position(constraint: *mut c_void, target_position: *mut c_void);
 
     fn scn_replicator_constraint_new(target: *mut c_void) -> *mut c_void;
@@ -35,15 +38,14 @@ extern "C" {
 
     fn scn_slider_constraint_new() -> *mut c_void;
     fn scn_slider_constraint_get_collision_category_bit_mask(constraint: *mut c_void) -> usize;
-    fn scn_slider_constraint_set_collision_category_bit_mask(
-        constraint: *mut c_void,
-        mask: usize,
-    );
+    fn scn_slider_constraint_set_collision_category_bit_mask(constraint: *mut c_void, mask: usize);
 
     fn scn_avoid_occluder_constraint_new(target: *mut c_void) -> *mut c_void;
     fn scn_avoid_occluder_constraint_get_target(constraint: *mut c_void) -> *mut c_void;
     fn scn_avoid_occluder_constraint_set_target(constraint: *mut c_void, target: *mut c_void);
-    fn scn_avoid_occluder_constraint_get_occluder_category_bit_mask(constraint: *mut c_void) -> usize;
+    fn scn_avoid_occluder_constraint_get_occluder_category_bit_mask(
+        constraint: *mut c_void,
+    ) -> usize;
     fn scn_avoid_occluder_constraint_set_occluder_category_bit_mask(
         constraint: *mut c_void,
         mask: usize,
@@ -124,20 +126,31 @@ impl IKConstraint {
     #[must_use]
     pub fn target_position(&self) -> Option<Vector3> {
         let mut value = Vector3::default();
-        let ok = unsafe { scn_ik_constraint_get_target_position(self.as_ptr(), value.as_mut_ptr().cast()) };
+        let ok = unsafe {
+            scn_ik_constraint_get_target_position(self.as_ptr(), value.as_mut_ptr().cast())
+        };
         ok.then_some(value)
     }
 
     pub fn set_target_position(&self, target_position: Vector3) {
         let mut target_position = target_position;
-        unsafe { scn_ik_constraint_set_target_position(self.as_ptr(), target_position.as_mut_ptr().cast()) };
+        unsafe {
+            scn_ik_constraint_set_target_position(
+                self.as_ptr(),
+                target_position.as_mut_ptr().cast(),
+            )
+        };
     }
 }
 
 impl ReplicatorConstraint {
     #[must_use]
     pub fn new(target: Option<&Node>) -> Option<Self> {
-        unsafe { Self::from_raw(scn_replicator_constraint_new(target.map_or(ptr::null_mut(), Node::as_ptr))) }
+        unsafe {
+            Self::from_raw(scn_replicator_constraint_new(
+                target.map_or(ptr::null_mut(), Node::as_ptr),
+            ))
+        }
     }
 
     #[must_use]
@@ -180,7 +193,9 @@ impl AccelerationConstraint {
     }
 
     pub fn set_maximum_linear_acceleration(&self, value: f64) {
-        unsafe { scn_acceleration_constraint_set_maximum_linear_acceleration(self.as_ptr(), value) };
+        unsafe {
+            scn_acceleration_constraint_set_maximum_linear_acceleration(self.as_ptr(), value)
+        };
     }
 }
 
@@ -230,7 +245,9 @@ impl AvoidOccluderConstraint {
     }
 
     pub fn set_occluder_category_bit_mask(&self, mask: usize) {
-        unsafe { scn_avoid_occluder_constraint_set_occluder_category_bit_mask(self.as_ptr(), mask) };
+        unsafe {
+            scn_avoid_occluder_constraint_set_occluder_category_bit_mask(self.as_ptr(), mask)
+        };
     }
 
     #[must_use]
