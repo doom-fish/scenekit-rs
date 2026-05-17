@@ -15,9 +15,11 @@ fn main() {
     println!("cargo:rustc-link-lib=framework=ModelIO");
     println!("cargo:rustc-link-lib=framework=QuartzCore");
     println!("cargo:rustc-link-lib=framework=CoreGraphics");
+    println!("cargo:rustc-link-lib=framework=SpriteKit");
     println!("cargo:rustc-link-lib=framework=AppKit");
     println!("cargo:rustc-link-lib=framework=AVFAudio");
     println!("cargo:rustc-link-lib=framework=Foundation");
+    println!("cargo:rustc-link-lib=framework=JavaScriptCore");
 
     let swift_dir = "swift-bridge";
     let out_dir = env::var("OUT_DIR").expect("missing OUT_DIR");

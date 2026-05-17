@@ -2,7 +2,7 @@
 
 Safe Rust bindings for Apple's [SceneKit](https://developer.apple.com/documentation/scenekit) framework on macOS.
 
-> **Status:** v0.2.0 adds dedicated Swift bridge files, Rust modules, examples, and tests for `SCNScene`, `SCNNode`, `SCNCamera`, `SCNLight`, `SCNGeometry`, `SCNMaterial`, `SCNAnimation`, `SCNPhysics`, `SCNView`, `SCNRenderer`, `SCNAction`, `SCNTransaction`, `SCNConstraint`, `SCNParticleSystem`, `SCNAudioPlayer`, `SCNHitTest`, and `SCNTechnique`.
+> **Status:** v0.2.2 closes the audited non-exempt SceneKit SDK surface on macOS: `COVERAGE_AUDIT.md` now reports 246/246 non-exempt symbols wrapped, including full `SCNSceneRenderer` coverage, public protocol/delegate bridges, extended geometry/constraint/physics wrappers, scene export, and SpriteKit overlay helpers.
 
 ## Quick start
 
@@ -71,14 +71,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 - Scene graph construction with `Scene`, `Node`, `Camera`, `Light`, `Geometry`, and `Material`
 - Animation and action playback through `Animation`, `AnimationPlayer`, and `Action`
-- Physics, constraints, particles, and audio attachment helpers on `Node`
-- Headless-safe `View` snapshots, `HitTest` helpers, and minimal `Technique` support
-- `Transaction` helpers for implicit animation scopes
+- Physics, constraints, particles, audio, morpher/skinner, and reference-node helpers across `Node`, `Scene`, and `PhysicsWorld`
+- Full `SCNSceneRenderer` coverage: presentation, frustum queries, project/unproject, prepare helpers, overlays, audio listener, reverse-Z, and delegates
+- Public protocol/delegate bridges for actionable/animatable/bounding-volume/technique support, node rendering, occluder avoidance, scene export, and scene rendering
 - Offline `Renderer` + `RenderPassDescriptor` integration for `apple-metal`
 
 ## Examples and tests
 
-The crate ships with 17 numbered examples and 17 integration test files. To run the full verification suite:
+The crate ships with 20 numbered examples and 23 integration test files. To run the full verification suite:
 
 ```bash
 cargo clippy --all-targets -- -D warnings

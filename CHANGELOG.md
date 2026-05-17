@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2] - 2026-05-17
+
+- Closed the audited non-exempt SceneKit SDK surface: `COVERAGE_AUDIT.md` now reports 246/246 verified symbols with 9 explicit exemptions and no remaining gaps
+- Expanded `SCNSceneRenderer` to cover scene presentation, hit/frustum queries, project/unproject, prepare helpers, SpriteKit overlays/transitions, working color space, Metal/audio handles, reverse-Z, and delegate getter/setter accessors
+- Added public Rust bridges for `SCNActionable`, `SCNAnimatable`, `SCNBoundingVolume`, `SCNTechniqueSupport`, `SCNNodeRendererDelegate`, `SCNAvoidOccluderConstraintDelegate`, `SCNSceneExportDelegate`, `SCNTimingFunction`, `SCNAnimationEvent`, and `SCNExportJavaScriptModule`
+- Added extended geometry, constraint, and physics wrappers including morpher/skinner/reference-node, advanced constraints, physics behaviors/joints/vehicles, and SpriteKit helper handles
+- Added focused integration coverage for the new scene-renderer, delegate, export, and extended-physics surfaces
+
 ## [0.2.1] - 2026-05-16
 
 - Added `SCNSceneRenderer`, `SCNSceneSource`, `SCNPhysicsWorld`, `SCNProgram`, and `SCNCameraController` bindings plus their delegate/constant surfaces

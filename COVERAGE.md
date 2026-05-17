@@ -1,37 +1,28 @@
-# SceneKit coverage audit for `scenekit-rs` v0.2.0
+# SceneKit coverage audit for `scenekit-rs` v0.2.2
 
-This audit tracks the requested logical SceneKit areas for the crate's v0.2.0 expansion. Each requested area now has a dedicated Swift bridge file, a Rust module, at least one example, and at least one integration test.
+`scenekit-rs` v0.2.2 closes the audited non-exempt SceneKit SDK surface for macOS 26.2.
 
-## Status matrix
+## Summary
+
+- `COVERAGE_AUDIT.md` now reports **246/246 non-exempt public symbols wrapped**.
+- The remaining 9 symbols stay explicitly exempt because they are deprecated/OpenGL-only APIs.
+- `SCNSceneRenderer` now includes scene presentation, frustum queries, project/unproject helpers, prepare helpers, SpriteKit overlays/transitions, working color space access, Metal/audio handles, reverse-Z toggles, and delegate getter/setter coverage.
+- Public protocol/delegate bridges now cover actionable, animatable, bounding-volume, technique-support, node-renderer, avoid-occluder, scene-export, and scene-renderer surfaces.
+
+## Newly completed logical areas in v0.2.2
 
 | Logical area | Status | Notes |
 | --- | --- | --- |
-| `SCNScene` | ✅ implemented | Scene creation/loading plus root node, background, lighting environment, and fog color accessors. |
-| `SCNNode` | ✅ implemented | Hierarchy, naming, transforms, hidden state, geometry/light/camera/physics attachments, and action execution. |
-| `SCNCamera` | ✅ implemented | Field of view, near/far clipping planes, and projection matrix round-tripping. |
-| `SCNLight` | ✅ implemented | Light type, color, intensity, shadow mode, and shadow-casting controls. |
-| `SCNGeometry` | ✅ implemented | Primitive constructors, `SCNText`, `SCNFloor`, `MDLMesh` import, and first-material access. |
-| `SCNMaterial` | ✅ implemented | Core material channels with color / texture / file URL contents and intensity management. |
-| `SCNAnimation` | ✅ implemented | Headless-safe `SCNAnimation` opacity creation, repeat/autoreverse/scene-time toggles, `SCNAnimationPlayer`, and node attachment helpers. |
-| `SCNPhysics` | ✅ implemented | `SCNPhysicsBody` creation, type switching, mass/restitution/friction, and force application. |
-| `SCNView` | ✅ implemented | `SCNView` creation, scene/point-of-view assignment, camera control, continuous rendering, background color, preferred FPS, and snapshot sizing. |
-| `SCNRenderer` | ✅ implemented | Offline renderer creation, scene / POV assignment, Metal render pass bridging, and texture readback. |
-| `SCNAction` | ✅ implemented | Move/rotate/scale, sequencing/grouping/repeat, and Rust callback-backed custom actions. |
-| `SCNTransaction` | ✅ implemented | Begin/commit/flush plus animation duration and action-disabling transaction globals. |
-| `SCNConstraint` | ✅ implemented | `SCNLookAtConstraint`, `SCNDistanceConstraint`, influence factor, gimbal lock, distance limits, and node constraint assignment. |
-| `SCNParticleSystem` | ✅ implemented | Particle system creation, birth rate/life span/looping, and node attachment/removal helpers. |
-| `SCNAudioPlayer` | ✅ implemented | URL-backed `SCNAudioSource`, volume/positional/looping controls, `SCNAudioPlayer`, and node attachment/removal helpers. |
-| `SCNHitTest` | ✅ implemented | `SCNView` hit-test entry point plus retained result collections, hit nodes, and world coordinates. |
-| `SCNTechnique` | ✅ implemented | Minimal draw-scene technique creation, dictionary key counting, float symbol KVC, and `SCNView.technique` assignment. |
+| `SCNSceneRenderer` | ✅ complete | Full protocol-level surface plus tests for overlays, projection, frustum queries, export, and delegate bridges. |
+| Advanced geometry / asset pipeline | ✅ complete | `SCNPyramid`, `SCNTube`, `SCNCapsule`, `SCNTorus`, `SCNShape`, `SCNGeometrySource`, `SCNGeometryElement`, `SCNGeometryTessellator`, `SCNLevelOfDetail`, `SCNMorpher`, `SCNReferenceNode`, `SCNSkinner`, and `SCNParticlePropertyController`. |
+| Extended constraints | ✅ complete | `SCNBillboardConstraint`, `SCNTransformConstraint`, `SCNIKConstraint`, `SCNReplicatorConstraint`, `SCNAccelerationConstraint`, `SCNSliderConstraint`, and `SCNAvoidOccluderConstraint`. |
+| Extended physics | ✅ complete | `SCNPhysicsBehavior`, `SCNPhysicsField`, `SCNPhysicsShape`, joints, vehicle/wheel wrappers, physics-world behavior helpers, and node physics-field helpers. |
+| Protocols / delegates / export | ✅ complete | Public Rust bridges for `SCNActionable`, `SCNAnimatable`, `SCNBoundingVolume`, `SCNTechniqueSupport`, `SCNNodeRendererDelegate`, `SCNAvoidOccluderConstraintDelegate`, `SCNSceneExportDelegate`, `SCNTimingFunction`, `SCNAnimationEvent`, and `SCNExportJavaScriptModule`. |
+| Constants / enums / C helpers | ✅ complete | Remaining audited SceneKit enums, option sets, exported constants, and math helpers are now exposed. |
 
-## Deferred broader SceneKit surface
+## Verification
 
-These broader SceneKit APIs remain out of scope for v0.2.0 and are intentionally deferred rather than silently omitted:
-
-1. `SCNSceneSource`, `SCNReferenceNode`, `SCNLevelOfDetail`, `SCNSkinner`, and `SCNMorpher` asset-pipeline wrappers.
-2. `SCNPhysicsWorld`, `SCNPhysicsField`, `SCNPhysicsBehavior`, `SCNPhysicsShape`, and contact-delegate bridging.
-3. Advanced `SCNAnimation` events, timing functions, and `CAAnimationGroup`/keyframe import helpers.
-4. Interactive `SCNView` delegate, playback, camera-controller-configuration, and event-handling APIs.
-5. Full `SCNTechnique` multi-pass shader/library/binding-block configuration beyond the minimal dictionary + symbol bridge.
-6. File-based `SCNParticleSystem` emitters and the wider particle modifier/event API surface.
-7. `SCNAudioPlayer` playback callback hooks and custom `AVAudioNode` initialization paths.
+```bash
+cargo clippy --all-targets -- -D warnings
+cargo test
+```
