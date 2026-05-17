@@ -1,6 +1,7 @@
 use core::ffi::{c_char, c_void};
 use core::ptr;
 use std::ffi::CString;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
 
 use crate::extended_constraints::AvoidOccluderConstraint;
@@ -127,15 +128,17 @@ extern "C" fn node_renderer_trampoline(
     node: *mut c_void,
     renderer: *mut c_void,
 ) {
-    if context.is_null() || node.is_null() || renderer.is_null() {
-        return;
-    }
-    let state = unsafe { node_renderer_state_from_context(context) };
-    if let Some(callback) = state.callbacks.render.as_mut() {
-        let node = unsafe { Node::from_raw_borrowed(node) };
-        let renderer = unsafe { Renderer::from_raw_borrowed(renderer) };
-        callback(&node, &renderer);
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() || node.is_null() || renderer.is_null() {
+            return;
+        }
+        let state = unsafe { node_renderer_state_from_context(context) };
+        if let Some(callback) = state.callbacks.render.as_mut() {
+            let node = unsafe { Node::from_raw_borrowed(node) };
+            let renderer = unsafe { Renderer::from_raw_borrowed(renderer) };
+            callback(&node, &renderer);
+        }
+    }));
 }
 
 impl NodeRendererDelegate {
@@ -245,19 +248,22 @@ extern "C" fn avoid_occluder_should_trampoline(
     occluder: *mut c_void,
     node: *mut c_void,
 ) -> bool {
-    if context.is_null() || occluder.is_null() || node.is_null() {
-        return true;
-    }
-    let state = unsafe { avoid_occluder_state_from_context(context) };
-    state
-        .callbacks
-        .should_avoid_occluder
-        .as_mut()
-        .map_or(true, |callback| {
-            let occluder = unsafe { Node::from_raw_borrowed(occluder) };
-            let node = unsafe { Node::from_raw_borrowed(node) };
-            callback(&occluder, &node)
-        })
+    catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() || occluder.is_null() || node.is_null() {
+            return true;
+        }
+        let state = unsafe { avoid_occluder_state_from_context(context) };
+        state
+            .callbacks
+            .should_avoid_occluder
+            .as_mut()
+            .map_or(true, |callback| {
+                let occluder = unsafe { Node::from_raw_borrowed(occluder) };
+                let node = unsafe { Node::from_raw_borrowed(node) };
+                callback(&occluder, &node)
+            })
+    }))
+    .unwrap_or(true)
 }
 
 extern "C" fn avoid_occluder_did_trampoline(
@@ -265,15 +271,17 @@ extern "C" fn avoid_occluder_did_trampoline(
     occluder: *mut c_void,
     node: *mut c_void,
 ) {
-    if context.is_null() || occluder.is_null() || node.is_null() {
-        return;
-    }
-    let state = unsafe { avoid_occluder_state_from_context(context) };
-    if let Some(callback) = state.callbacks.did_avoid_occluder.as_mut() {
-        let occluder = unsafe { Node::from_raw_borrowed(occluder) };
-        let node = unsafe { Node::from_raw_borrowed(node) };
-        callback(&occluder, &node);
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() || occluder.is_null() || node.is_null() {
+            return;
+        }
+        let state = unsafe { avoid_occluder_state_from_context(context) };
+        if let Some(callback) = state.callbacks.did_avoid_occluder.as_mut() {
+            let occluder = unsafe { Node::from_raw_borrowed(occluder) };
+            let node = unsafe { Node::from_raw_borrowed(node) };
+            callback(&occluder, &node);
+        }
+    }));
 }
 
 impl AvoidOccluderConstraintDelegate {
@@ -349,24 +357,27 @@ extern "C" fn scene_export_write_image_trampoline(
     document_url: *const c_char,
     original_image_url: *const c_char,
 ) -> *const c_char {
-    if context.is_null() || document_url.is_null() {
-        return ptr::null();
-    }
-    let state = unsafe { scene_export_state_from_context(context) };
-    let document_url = unsafe { std::ffi::CStr::from_ptr(document_url) }
-        .to_string_lossy()
-        .into_owned();
-    let original_image_url = (!original_image_url.is_null()).then(|| unsafe {
-        std::ffi::CStr::from_ptr(original_image_url)
+    catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() || document_url.is_null() {
+            return ptr::null();
+        }
+        let state = unsafe { scene_export_state_from_context(context) };
+        let document_url = unsafe { std::ffi::CStr::from_ptr(document_url) }
             .to_string_lossy()
-            .into_owned()
-    });
-    state.returned_path = (state.callback)(document_url.as_str(), original_image_url.as_deref())
-        .and_then(|path| CString::new(path).ok());
-    state
-        .returned_path
-        .as_ref()
-        .map_or(ptr::null(), |path| path.as_ptr())
+            .into_owned();
+        let original_image_url = (!original_image_url.is_null()).then(|| unsafe {
+            std::ffi::CStr::from_ptr(original_image_url)
+                .to_string_lossy()
+                .into_owned()
+        });
+        state.returned_path = (state.callback)(document_url.as_str(), original_image_url.as_deref())
+            .and_then(|path| CString::new(path).ok());
+        state
+            .returned_path
+            .as_ref()
+            .map_or(ptr::null(), |path| path.as_ptr())
+    }))
+    .unwrap_or(ptr::null())
 }
 
 impl SceneExportDelegate {

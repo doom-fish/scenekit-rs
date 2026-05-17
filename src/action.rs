@@ -1,4 +1,5 @@
 use core::ffi::c_void;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Mutex;
 
 use crate::ffi;
@@ -15,14 +16,16 @@ struct ActionCallbackState {
 }
 
 extern "C" fn action_invoke(context: *mut c_void, node: *mut c_void, elapsed: f64) {
-    let Some(context) = core::ptr::NonNull::new(context.cast::<ActionCallbackState>()) else {
-        return;
-    };
-    let state = unsafe { context.as_ref() };
-    if let Ok(mut callback) = state.callback.lock() {
-        let node = unsafe { Node::from_raw_borrowed(node) };
-        callback(node, elapsed);
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let Some(context) = core::ptr::NonNull::new(context.cast::<ActionCallbackState>()) else {
+            return;
+        };
+        let state = unsafe { context.as_ref() };
+        if let Ok(mut callback) = state.callback.lock() {
+            let node = unsafe { Node::from_raw_borrowed(node) };
+            callback(node, elapsed);
+        }
+    }));
 }
 
 extern "C" fn action_drop(context: *mut c_void) {

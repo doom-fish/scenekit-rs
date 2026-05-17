@@ -1,5 +1,6 @@
 use core::ffi::c_void;
 use core::ptr;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::ffi;
 use crate::math::Vector3;
@@ -144,15 +145,21 @@ unsafe fn with_contact_callback(
 }
 
 extern "C" fn physics_did_begin_contact_trampoline(context: *mut c_void, contact: *mut c_void) {
-    unsafe { with_contact_callback(context, contact, |callbacks| &mut callbacks.begin) };
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        unsafe { with_contact_callback(context, contact, |callbacks| &mut callbacks.begin) };
+    }));
 }
 
 extern "C" fn physics_did_update_contact_trampoline(context: *mut c_void, contact: *mut c_void) {
-    unsafe { with_contact_callback(context, contact, |callbacks| &mut callbacks.update) };
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        unsafe { with_contact_callback(context, contact, |callbacks| &mut callbacks.update) };
+    }));
 }
 
 extern "C" fn physics_did_end_contact_trampoline(context: *mut c_void, contact: *mut c_void) {
-    unsafe { with_contact_callback(context, contact, |callbacks| &mut callbacks.end) };
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        unsafe { with_contact_callback(context, contact, |callbacks| &mut callbacks.end) };
+    }));
 }
 
 impl PhysicsContactDelegate {

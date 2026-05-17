@@ -1,5 +1,6 @@
 use core::ffi::{c_char, c_void};
 use core::ptr;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::action::Action;
 use crate::animation::{Animation, AnimationPlayer};
@@ -294,11 +295,13 @@ extern "C" fn release_animation_event_context(context: *mut c_void) {
 }
 
 extern "C" fn animation_event_trampoline(context: *mut c_void, playing_backward: bool) {
-    if context.is_null() {
-        return;
-    }
-    let state = unsafe { animation_event_state_from_context(context) };
-    (state.callback)(playing_backward);
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() {
+            return;
+        }
+        let state = unsafe { animation_event_state_from_context(context) };
+        (state.callback)(playing_backward);
+    }));
 }
 
 impl AnimationEvent {

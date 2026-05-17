@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.3] - 2025-05-17
+
+- Added panic safety to all FFI callbacks using `catch_unwind`: `action_invoke`, `camera_controller` delegates, `node_renderer` delegate, `avoid_occluder_constraint` delegates, `scene_export` delegate, `physics_contact` delegates, `program` delegates, `animation_event` callbacks, and `scene_renderer` delegates
+
 ## [0.2.2] - 2026-05-17
 
 - Closed the audited non-exempt SceneKit SDK surface: `COVERAGE_AUDIT.md` now reports 246/246 verified symbols with 9 explicit exemptions and no remaining gaps

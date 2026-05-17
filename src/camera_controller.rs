@@ -1,5 +1,6 @@
 use core::ffi::c_void;
 use core::ptr;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::ffi;
 use crate::math::Vector3;
@@ -117,23 +118,27 @@ extern "C" fn release_camera_controller_delegate_context(context: *mut c_void) {
 }
 
 extern "C" fn camera_controller_inertia_will_start_trampoline(context: *mut c_void) {
-    if context.is_null() {
-        return;
-    }
-    let state = unsafe { delegate_state_from_context(context) };
-    if let Some(callback) = state.callbacks.inertia_will_start.as_mut() {
-        callback();
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() {
+            return;
+        }
+        let state = unsafe { delegate_state_from_context(context) };
+        if let Some(callback) = state.callbacks.inertia_will_start.as_mut() {
+            callback();
+        }
+    }));
 }
 
 extern "C" fn camera_controller_inertia_did_end_trampoline(context: *mut c_void) {
-    if context.is_null() {
-        return;
-    }
-    let state = unsafe { delegate_state_from_context(context) };
-    if let Some(callback) = state.callbacks.inertia_did_end.as_mut() {
-        callback();
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() {
+            return;
+        }
+        let state = unsafe { delegate_state_from_context(context) };
+        if let Some(callback) = state.callbacks.inertia_did_end.as_mut() {
+            callback();
+        }
+    }));
 }
 
 impl CameraControllerDelegate {

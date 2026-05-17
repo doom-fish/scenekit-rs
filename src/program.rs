@@ -1,5 +1,6 @@
 use core::ffi::{c_char, c_void};
 use core::ptr;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::error::{take_string, SceneKitError};
 use crate::ffi;
@@ -141,26 +142,30 @@ extern "C" fn release_program_buffer_binding_context(context: *mut c_void) {
 }
 
 extern "C" fn program_delegate_handle_error_trampoline(context: *mut c_void, message: *mut c_char) {
-    if context.is_null() {
-        if !message.is_null() {
-            let _ = unsafe { take_string(message) };
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() {
+            if !message.is_null() {
+                let _ = unsafe { take_string(message) };
+            }
+            return;
         }
-        return;
-    }
 
-    let state = unsafe { program_delegate_state_from_context(context) };
-    let message = unsafe { take_string(message) }
-        .unwrap_or_else(|| "SCNProgramDelegate.handleError invoked without a message".to_owned());
-    (state.handle_error)(SceneKitError::new(message));
+        let state = unsafe { program_delegate_state_from_context(context) };
+        let message = unsafe { take_string(message) }
+            .unwrap_or_else(|| "SCNProgramDelegate.handleError invoked without a message".to_owned());
+        (state.handle_error)(SceneKitError::new(message));
+    }));
 }
 
 extern "C" fn program_buffer_binding_trampoline(context: *mut c_void, buffer_stream: *mut c_void) {
-    if context.is_null() || buffer_stream.is_null() {
-        return;
-    }
-    let state = unsafe { program_buffer_binding_state_from_context(context) };
-    let buffer_stream = unsafe { BufferStream::from_raw_borrowed(buffer_stream) };
-    (state.callback)(&buffer_stream);
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() || buffer_stream.is_null() {
+            return;
+        }
+        let state = unsafe { program_buffer_binding_state_from_context(context) };
+        let buffer_stream = unsafe { BufferStream::from_raw_borrowed(buffer_stream) };
+        (state.callback)(&buffer_stream);
+    }));
 }
 
 impl ProgramDelegate {

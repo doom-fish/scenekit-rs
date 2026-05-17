@@ -2,6 +2,7 @@ use apple_cf::cg::CGColorSpace;
 use core::ffi::c_void;
 use core::ptr;
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::ffi;
 use crate::geometry::Geometry;
@@ -351,43 +352,51 @@ extern "C" fn release_scene_renderer_delegate_context(context: *mut c_void) {
 }
 
 extern "C" fn scene_renderer_update_trampoline(context: *mut c_void, time: f64) {
-    if context.is_null() {
-        return;
-    }
-    let state = unsafe { delegate_state_from_context(context) };
-    if let Some(callback) = state.callbacks.update.as_mut() {
-        callback(time);
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() {
+            return;
+        }
+        let state = unsafe { delegate_state_from_context(context) };
+        if let Some(callback) = state.callbacks.update.as_mut() {
+            callback(time);
+        }
+    }));
 }
 
 extern "C" fn scene_renderer_did_apply_animations_trampoline(context: *mut c_void, time: f64) {
-    if context.is_null() {
-        return;
-    }
-    let state = unsafe { delegate_state_from_context(context) };
-    if let Some(callback) = state.callbacks.did_apply_animations.as_mut() {
-        callback(time);
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() {
+            return;
+        }
+        let state = unsafe { delegate_state_from_context(context) };
+        if let Some(callback) = state.callbacks.did_apply_animations.as_mut() {
+            callback(time);
+        }
+    }));
 }
 
 extern "C" fn scene_renderer_did_simulate_physics_trampoline(context: *mut c_void, time: f64) {
-    if context.is_null() {
-        return;
-    }
-    let state = unsafe { delegate_state_from_context(context) };
-    if let Some(callback) = state.callbacks.did_simulate_physics.as_mut() {
-        callback(time);
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() {
+            return;
+        }
+        let state = unsafe { delegate_state_from_context(context) };
+        if let Some(callback) = state.callbacks.did_simulate_physics.as_mut() {
+            callback(time);
+        }
+    }));
 }
 
 extern "C" fn scene_renderer_did_apply_constraints_trampoline(context: *mut c_void, time: f64) {
-    if context.is_null() {
-        return;
-    }
-    let state = unsafe { delegate_state_from_context(context) };
-    if let Some(callback) = state.callbacks.did_apply_constraints.as_mut() {
-        callback(time);
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() {
+            return;
+        }
+        let state = unsafe { delegate_state_from_context(context) };
+        if let Some(callback) = state.callbacks.did_apply_constraints.as_mut() {
+            callback(time);
+        }
+    }));
 }
 
 extern "C" fn scene_renderer_will_render_scene_trampoline(
@@ -395,14 +404,16 @@ extern "C" fn scene_renderer_will_render_scene_trampoline(
     scene: *mut c_void,
     time: f64,
 ) {
-    if context.is_null() || scene.is_null() {
-        return;
-    }
-    let state = unsafe { delegate_state_from_context(context) };
-    if let Some(callback) = state.callbacks.will_render_scene.as_mut() {
-        let scene = unsafe { Scene::from_raw_borrowed(scene) };
-        callback(&scene, time);
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() || scene.is_null() {
+            return;
+        }
+        let state = unsafe { delegate_state_from_context(context) };
+        if let Some(callback) = state.callbacks.will_render_scene.as_mut() {
+            let scene = unsafe { Scene::from_raw_borrowed(scene) };
+            callback(&scene, time);
+        }
+    }));
 }
 
 extern "C" fn scene_renderer_did_render_scene_trampoline(
@@ -410,14 +421,16 @@ extern "C" fn scene_renderer_did_render_scene_trampoline(
     scene: *mut c_void,
     time: f64,
 ) {
-    if context.is_null() || scene.is_null() {
-        return;
-    }
-    let state = unsafe { delegate_state_from_context(context) };
-    if let Some(callback) = state.callbacks.did_render_scene.as_mut() {
-        let scene = unsafe { Scene::from_raw_borrowed(scene) };
-        callback(&scene, time);
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() || scene.is_null() {
+            return;
+        }
+        let state = unsafe { delegate_state_from_context(context) };
+        if let Some(callback) = state.callbacks.did_render_scene.as_mut() {
+            let scene = unsafe { Scene::from_raw_borrowed(scene) };
+            callback(&scene, time);
+        }
+    }));
 }
 
 impl SceneRendererDelegate {
