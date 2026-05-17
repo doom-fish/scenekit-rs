@@ -138,7 +138,7 @@ impl IKConstraint {
             scn_ik_constraint_set_target_position(
                 self.as_ptr(),
                 target_position.as_mut_ptr().cast(),
-            )
+            );
         };
     }
 }
@@ -194,7 +194,7 @@ impl AccelerationConstraint {
 
     pub fn set_maximum_linear_acceleration(&self, value: f64) {
         unsafe {
-            scn_acceleration_constraint_set_maximum_linear_acceleration(self.as_ptr(), value)
+            scn_acceleration_constraint_set_maximum_linear_acceleration(self.as_ptr(), value);
         };
     }
 }
@@ -246,7 +246,7 @@ impl AvoidOccluderConstraint {
 
     pub fn set_occluder_category_bit_mask(&self, mask: usize) {
         unsafe {
-            scn_avoid_occluder_constraint_set_occluder_category_bit_mask(self.as_ptr(), mask)
+            scn_avoid_occluder_constraint_set_occluder_category_bit_mask(self.as_ptr(), mask);
         };
     }
 

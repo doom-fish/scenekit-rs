@@ -463,7 +463,7 @@ impl AvoidOccluderConstraint {
                 self.as_ptr(),
                 occluder.as_ptr(),
                 node.as_ptr(),
-            )
+            );
         };
     }
 }

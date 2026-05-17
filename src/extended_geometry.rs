@@ -371,7 +371,7 @@ impl ParticlePropertyController {
 
     pub fn set_input_mode(&self, input_mode: ParticleInputMode) {
         unsafe {
-            scn_particle_property_controller_set_input_mode(self.as_ptr(), input_mode as i32)
+            scn_particle_property_controller_set_input_mode(self.as_ptr(), input_mode as i32);
         };
     }
 }

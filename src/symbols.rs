@@ -495,7 +495,7 @@ pub fn matrix4_mult(a: Matrix4, b: Matrix4) -> Matrix4 {
             a.as_mut_ptr().cast(),
             b.as_mut_ptr().cast(),
             out.as_mut_ptr().cast(),
-        )
+        );
     };
     out
 }
