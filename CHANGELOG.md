@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.6] - 2026-05-18
+
+- Widen apple-cf version bound to `<0.10` so 0.9.x resolves.
+
 ## [0.2.5] - 2026-05-18
 
 - Widen apple-metal version bound so the 0.x bump dep resolves. No source changes.
