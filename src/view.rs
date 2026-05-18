@@ -9,22 +9,26 @@ use crate::scene::Scene;
 handle_type!(View);
 
 impl View {
+    /// Creates a wrapped `SCNView` instance.
     #[must_use]
     pub fn new(width: f64, height: f64) -> Option<Self> {
         unsafe { Self::from_raw(ffi::scn_view_new(width, height)) }
     }
 
+    /// Sets the `SCNView.scene` member.
     pub fn set_scene(&self, scene: Option<&Scene>) {
         unsafe {
             ffi::scn_view_set_scene(self.ptr, scene.map_or(ptr::null_mut(), Scene::as_ptr));
         };
     }
 
+    /// Mirrors `SCNView.scene`.
     #[must_use]
     pub fn scene(&self) -> Option<Scene> {
         unsafe { Scene::from_raw(ffi::scn_view_scene(self.ptr)) }
     }
 
+    /// Sets the `SCNView.pointOfView` member.
     pub fn set_point_of_view(&self, point_of_view: Option<&Node>) {
         unsafe {
             ffi::scn_view_set_point_of_view(
@@ -34,29 +38,35 @@ impl View {
         };
     }
 
+    /// Mirrors `SCNView.pointOfView`.
     #[must_use]
     pub fn point_of_view(&self) -> Option<Node> {
         unsafe { Node::from_raw(ffi::scn_view_point_of_view(self.ptr)) }
     }
 
+    /// Mirrors `SCNView.allowsCameraControl`.
     #[must_use]
     pub fn allows_camera_control(&self) -> bool {
         unsafe { ffi::scn_view_get_allows_camera_control(self.ptr) }
     }
 
+    /// Sets the `SCNView.allowsCameraControl` member.
     pub fn set_allows_camera_control(&self, allows_camera_control: bool) {
         unsafe { ffi::scn_view_set_allows_camera_control(self.ptr, allows_camera_control) };
     }
 
+    /// Mirrors `SCNView.rendersContinuously`.
     #[must_use]
     pub fn renders_continuously(&self) -> bool {
         unsafe { ffi::scn_view_get_renders_continuously(self.ptr) }
     }
 
+    /// Sets the `SCNView.rendersContinuously` member.
     pub fn set_renders_continuously(&self, renders_continuously: bool) {
         unsafe { ffi::scn_view_set_renders_continuously(self.ptr, renders_continuously) };
     }
 
+    /// Mirrors `SCNView.backgroundColor`.
     #[must_use]
     pub fn background_color(&self) -> Option<Color> {
         let mut rgba = [0.0_f32; 4];
@@ -64,10 +74,12 @@ impl View {
         ok.then(|| Color::rgba(rgba[0], rgba[1], rgba[2], rgba[3]))
     }
 
+    /// Sets the `SCNView.backgroundColor` member.
     pub fn set_background_color(&self, color: Color) {
         unsafe { ffi::scn_view_set_background_color(self.ptr, color.r, color.g, color.b, color.a) };
     }
 
+    /// Mirrors `SCNView.snapshotDimensions`.
     #[must_use]
     pub fn snapshot_dimensions(&self) -> Option<(f64, f64)> {
         let mut size = [0.0_f64; 2];
@@ -75,11 +87,13 @@ impl View {
         ok.then_some(size.into())
     }
 
+    /// Mirrors `SCNView.preferredFramesPerSecond`.
     #[must_use]
     pub fn preferred_frames_per_second(&self) -> isize {
         unsafe { ffi::scn_view_get_preferred_frames_per_second(self.ptr) }
     }
 
+    /// Sets the `SCNView.preferredFramesPerSecond` member.
     pub fn set_preferred_frames_per_second(&self, preferred_frames_per_second: isize) {
         unsafe {
             ffi::scn_view_set_preferred_frames_per_second(self.ptr, preferred_frames_per_second);

@@ -2,10 +2,12 @@ use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 
+/// Marker trait sealing internal SceneKit extension implementations.
 pub trait Sealed {}
 
 macro_rules! handle_type {
-    ($name:ident) => {
+    (@emit $name:ident, $type_doc:expr, $ptr_doc:expr) => {
+        #[doc = $type_doc]
         pub struct $name {
             pub(crate) ptr: *mut core::ffi::c_void,
             owned: bool,
@@ -47,24 +49,52 @@ macro_rules! handle_type {
                 Self { ptr, owned: false }
             }
 
+            #[doc = $ptr_doc]
             #[must_use]
             pub const fn as_ptr(&self) -> *mut core::ffi::c_void {
                 self.ptr
             }
         }
     };
+    ($name:ident) => {
+        handle_type!(
+            @emit
+            $name,
+            concat!("Wraps `SCN", stringify!($name), "`."),
+            concat!(
+                "Returns the Objective-C pointer backing this `SCN",
+                stringify!($name),
+                "` wrapper."
+            )
+        );
+    };
+    ($name:ident, $counterpart:literal) => {
+        handle_type!(
+            @emit
+            $name,
+            concat!("Wraps `", $counterpart, "`."),
+            concat!(
+                "Returns the Objective-C pointer backing this `",
+                $counterpart,
+                "` wrapper."
+            )
+        );
+    };
 }
 
 pub(crate) use handle_type;
 
+/// Builds a `CString` for SceneKit bridge calls.
 pub fn cstring_from_str(value: &str) -> Option<CString> {
     CString::new(value).ok()
 }
 
+/// Builds a `CString` from a filesystem path for SceneKit bridge calls.
 pub fn cstring_from_path(path: &Path) -> Option<CString> {
     CString::new(path.as_os_str().as_bytes()).ok()
 }
 
+/// Looks up a SceneKit string constant by symbol name.
 pub fn lookup_string_constant(symbol: &str) -> String {
     let c_string = cstring_from_str(symbol)
         .expect("SceneKit constant symbol names never contain interior NUL bytes");

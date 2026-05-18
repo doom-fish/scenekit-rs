@@ -1,3 +1,5 @@
+#![allow(clippy::doc_markdown)]
+//! Build script for the `scenekit-rs` `SceneKit` bridge.
 use std::env;
 use std::process::Command;
 

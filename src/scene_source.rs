@@ -7,17 +7,24 @@ use crate::scene::Scene;
 
 handle_type!(SceneSource);
 
+/// Mirrors `SCNSceneSourceStatus`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum SceneSourceStatus {
+    /// Corresponds to the `SCNSceneSourceStatus::Error` case.
     Error = -1,
+    /// Corresponds to the `SCNSceneSourceStatus::Parsing` case.
     Parsing = 4,
+    /// Corresponds to the `SCNSceneSourceStatus::Validating` case.
     Validating = 8,
+    /// Corresponds to the `SCNSceneSourceStatus::Processing` case.
     Processing = 12,
+    /// Corresponds to the `SCNSceneSourceStatus::Complete` case.
     Complete = 16,
 }
 
 impl SceneSourceStatus {
+    /// Mirrors `SCNSceneSourceStatus.fromRaw`.
     #[must_use]
     pub const fn from_raw(value: i32) -> Option<Self> {
         match value {
@@ -31,23 +38,35 @@ impl SceneSourceStatus {
     }
 }
 
+/// Mirrors `SCNSceneSource entry classes`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum SceneSourceEntryClass {
+    /// Corresponds to the `SCNSceneSource entry classes::Material` case.
     Material = 0,
+    /// Corresponds to the `SCNSceneSource entry classes::Geometry` case.
     Geometry = 1,
+    /// Corresponds to the `SCNSceneSource entry classes::Scene` case.
     Scene = 2,
+    /// Corresponds to the `SCNSceneSource entry classes::Node` case.
     Node = 3,
+    /// Corresponds to the `SCNSceneSource entry classes::Animation` case.
     Animation = 4,
+    /// Corresponds to the `SCNSceneSource entry classes::Light` case.
     Light = 5,
+    /// Corresponds to the `SCNSceneSource entry classes::Camera` case.
     Camera = 6,
+    /// Corresponds to the `SCNSceneSource entry classes::Skinner` case.
     Skinner = 7,
+    /// Corresponds to the `SCNSceneSource entry classes::Morpher` case.
     Morpher = 8,
+    /// Corresponds to the `SCNSceneSource entry classes::Image` case.
     Image = 9,
 }
 
 macro_rules! string_constant_fn {
     ($name:ident, $symbol:literal) => {
+        #[doc = concat!("Returns the SceneKit constant `", $symbol, "`.")]
         #[must_use]
         pub fn $name() -> String {
             lookup_string_constant($symbol)
@@ -159,6 +178,7 @@ string_constant_fn!(
 );
 
 impl SceneSource {
+    /// Mirrors `SCNSceneSource.fromUrl`.
     pub fn from_url(path: impl AsRef<Path>) -> Result<Self, SceneKitError> {
         let path = cstring_from_path(path.as_ref())
             .ok_or_else(|| SceneKitError::new("path contains an interior NUL byte"))?;
@@ -171,6 +191,7 @@ impl SceneSource {
         }
     }
 
+    /// Mirrors `SCNSceneSource.fromData`.
     pub fn from_data(data: &[u8]) -> Result<Self, SceneKitError> {
         let mut error = core::ptr::null_mut();
         let ptr =
@@ -182,11 +203,13 @@ impl SceneSource {
         }
     }
 
+    /// Mirrors `SCNSceneSource.url`.
     #[must_use]
     pub fn url(&self) -> Option<String> {
         unsafe { take_string(ffi::scn_scene_source_copy_url(self.ptr)) }
     }
 
+    /// Mirrors `SCNSceneSource.scene`.
     pub fn scene(&self) -> Result<Scene, SceneKitError> {
         let mut error = core::ptr::null_mut();
         let ptr = unsafe { ffi::scn_scene_source_new_scene(self.ptr, &mut error) };
@@ -197,6 +220,7 @@ impl SceneSource {
         }
     }
 
+    /// Mirrors `SCNSceneSource.propertyForKey`.
     #[must_use]
     pub fn property_for_key(&self, key: &str) -> Option<String> {
         let key = crate::private::cstring_from_str(key)?;
@@ -208,6 +232,7 @@ impl SceneSource {
         }
     }
 
+    /// Mirrors `SCNSceneSource.identifiersOfEntries`.
     #[must_use]
     pub fn identifiers_of_entries(&self, entry_class: SceneSourceEntryClass) -> Vec<String> {
         let Some(raw) = (unsafe {

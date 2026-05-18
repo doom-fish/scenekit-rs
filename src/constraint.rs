@@ -8,6 +8,7 @@ use crate::private::handle_type;
 handle_type!(Constraint);
 
 impl Constraint {
+    /// Mirrors `SCNConstraint.lookAt`.
     #[must_use]
     pub fn look_at(target: Option<&Node>) -> Option<Self> {
         unsafe {
@@ -17,6 +18,7 @@ impl Constraint {
         }
     }
 
+    /// Mirrors `SCNConstraint.distance`.
     #[must_use]
     pub fn distance(target: Option<&Node>) -> Option<Self> {
         unsafe {
@@ -26,44 +28,53 @@ impl Constraint {
         }
     }
 
+    /// Mirrors `SCNConstraint.influenceFactor`.
     #[must_use]
     pub fn influence_factor(&self) -> f64 {
         unsafe { ffi::scn_constraint_get_influence_factor(self.ptr) }
     }
 
+    /// Sets the `SCNConstraint.influenceFactor` member.
     pub fn set_influence_factor(&self, influence_factor: f64) {
         unsafe { ffi::scn_constraint_set_influence_factor(self.ptr, influence_factor) };
     }
 
+    /// Mirrors `SCNConstraint.gimbalLockEnabled`.
     #[must_use]
     pub fn gimbal_lock_enabled(&self) -> bool {
         unsafe { ffi::scn_constraint_get_gimbal_lock_enabled(self.ptr) }
     }
 
+    /// Sets the `SCNConstraint.gimbalLockEnabled` member.
     pub fn set_gimbal_lock_enabled(&self, gimbal_lock_enabled: bool) {
         unsafe { ffi::scn_constraint_set_gimbal_lock_enabled(self.ptr, gimbal_lock_enabled) };
     }
 
+    /// Mirrors `SCNConstraint.minimumDistance`.
     #[must_use]
     pub fn minimum_distance(&self) -> f64 {
         unsafe { ffi::scn_constraint_get_minimum_distance(self.ptr) }
     }
 
+    /// Sets the `SCNConstraint.minimumDistance` member.
     pub fn set_minimum_distance(&self, minimum_distance: f64) {
         unsafe { ffi::scn_constraint_set_minimum_distance(self.ptr, minimum_distance) };
     }
 
+    /// Mirrors `SCNConstraint.maximumDistance`.
     #[must_use]
     pub fn maximum_distance(&self) -> f64 {
         unsafe { ffi::scn_constraint_get_maximum_distance(self.ptr) }
     }
 
+    /// Sets the `SCNConstraint.maximumDistance` member.
     pub fn set_maximum_distance(&self, maximum_distance: f64) {
         unsafe { ffi::scn_constraint_set_maximum_distance(self.ptr, maximum_distance) };
     }
 }
 
 impl Node {
+    /// Sets the `SCNNode.constraints` member.
     pub fn set_constraints(&self, constraints: &[&Constraint]) {
         let mut raw: Vec<*mut c_void> = constraints
             .iter()
@@ -77,6 +88,7 @@ impl Node {
         unsafe { ffi::scn_node_set_constraints(self.ptr, raw_ptr, constraints.len()) };
     }
 
+    /// Mirrors `SCNNode.constraintsCount`.
     #[must_use]
     pub fn constraints_count(&self) -> usize {
         unsafe { ffi::scn_node_constraints_count(self.ptr) }

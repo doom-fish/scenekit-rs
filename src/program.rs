@@ -11,15 +11,20 @@ use crate::private::{cstring_from_str, handle_type, lookup_string_constant, Seal
 handle_type!(BufferStream);
 handle_type!(Program);
 
+/// Mirrors `SCNBufferFrequency`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum BufferFrequency {
+    /// Corresponds to the `SCNBufferFrequency::PerFrame` case.
     PerFrame = 0,
+    /// Corresponds to the `SCNBufferFrequency::PerNode` case.
     PerNode = 1,
+    /// Corresponds to the `SCNBufferFrequency::PerShadable` case.
     PerShadable = 2,
 }
 
 impl BufferFrequency {
+    /// Mirrors `SCNBufferFrequency.fromRaw`.
     #[must_use]
     pub const fn from_raw(value: i32) -> Option<Self> {
         match value {
@@ -33,6 +38,7 @@ impl BufferFrequency {
 
 macro_rules! string_constant_fn {
     ($name:ident, $symbol:literal) => {
+        #[doc = concat!("Returns the SceneKit constant `", $symbol, "`.")]
         #[must_use]
         pub fn $name() -> String {
             lookup_string_constant($symbol)
@@ -69,10 +75,12 @@ struct ProgramBufferBindingState {
     callback: BufferBindingCallback,
 }
 
+/// Wraps `SCNProgramDelegate`.
 pub struct ProgramDelegate {
     ptr: *mut c_void,
 }
 
+/// Wraps `SCNBufferBindingBlock`.
 pub struct ProgramBufferBinding {
     ptr: *mut c_void,
 }
@@ -151,8 +159,9 @@ extern "C" fn program_delegate_handle_error_trampoline(context: *mut c_void, mes
         }
 
         let state = unsafe { program_delegate_state_from_context(context) };
-        let message = unsafe { take_string(message) }
-            .unwrap_or_else(|| "SCNProgramDelegate.handleError invoked without a message".to_owned());
+        let message = unsafe { take_string(message) }.unwrap_or_else(|| {
+            "SCNProgramDelegate.handleError invoked without a message".to_owned()
+        });
         (state.handle_error)(SceneKitError::new(message));
     }));
 }
@@ -169,6 +178,7 @@ extern "C" fn program_buffer_binding_trampoline(context: *mut c_void, buffer_str
 }
 
 impl ProgramDelegate {
+    /// Creates a wrapped `SCNProgramDelegate` instance.
     #[must_use]
     pub fn new<F>(callback: F) -> Option<Self>
     where
@@ -193,6 +203,7 @@ impl ProgramDelegate {
         }
     }
 
+    /// Returns the Objective-C pointer backing this `SCNProgramDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
         self.ptr
@@ -200,6 +211,7 @@ impl ProgramDelegate {
 }
 
 impl ProgramBufferBinding {
+    /// Creates a wrapped `SCNBufferBindingBlock` instance.
     #[must_use]
     pub fn new<F>(callback: F) -> Option<Self>
     where
@@ -224,21 +236,27 @@ impl ProgramBufferBinding {
         }
     }
 
+    /// Returns the Objective-C pointer backing this `SCNBufferBindingBlock` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
         self.ptr
     }
 }
 
+/// Mirrors the `SCNShadable` protocol.
 pub trait Shadable: Sealed {
+    /// Mirrors the `SCNShadable.program` protocol requirement.
     #[must_use]
     fn program(&self) -> Option<Program>;
 
+    /// Sets the `SCNShadable.program` member.
     fn set_program(&self, program: Option<&Program>);
 
+    /// Mirrors the `SCNShadable.shaderModifier` protocol requirement.
     #[must_use]
     fn shader_modifier(&self, entry_point: &str) -> Option<String>;
 
+    /// Sets the `SCNShadable.shaderModifier` member.
     fn set_shader_modifier(&self, entry_point: &str, shader_modifier: Option<&str>);
 }
 
@@ -329,6 +347,7 @@ impl Shadable for Material {
 }
 
 impl BufferStream {
+    /// Mirrors `SCNBufferStream.writeBytes`.
     pub fn write_bytes(&self, bytes: &[u8]) {
         if bytes.is_empty() {
             return;
@@ -338,16 +357,19 @@ impl BufferStream {
 }
 
 impl Program {
+    /// Creates a wrapped `SCNProgram` instance.
     #[must_use]
     pub fn new() -> Option<Self> {
         unsafe { Self::from_raw(ffi::scn_program_new()) }
     }
 
+    /// Mirrors `SCNProgram.vertexShader`.
     #[must_use]
     pub fn vertex_shader(&self) -> Option<String> {
         unsafe { take_string(ffi::scn_program_copy_vertex_shader(self.ptr)) }
     }
 
+    /// Sets the `SCNProgram.vertexShader` member.
     pub fn set_vertex_shader(&self, vertex_shader: Option<&str>) {
         let vertex_shader = vertex_shader.and_then(cstring_from_str);
         unsafe {
@@ -360,11 +382,13 @@ impl Program {
         };
     }
 
+    /// Mirrors `SCNProgram.fragmentShader`.
     #[must_use]
     pub fn fragment_shader(&self) -> Option<String> {
         unsafe { take_string(ffi::scn_program_copy_fragment_shader(self.ptr)) }
     }
 
+    /// Sets the `SCNProgram.fragmentShader` member.
     pub fn set_fragment_shader(&self, fragment_shader: Option<&str>) {
         let fragment_shader = fragment_shader.and_then(cstring_from_str);
         unsafe {
@@ -377,11 +401,13 @@ impl Program {
         };
     }
 
+    /// Mirrors `SCNProgram.geometryShader`.
     #[must_use]
     pub fn geometry_shader(&self) -> Option<String> {
         unsafe { take_string(ffi::scn_program_copy_geometry_shader(self.ptr)) }
     }
 
+    /// Sets the `SCNProgram.geometryShader` member.
     pub fn set_geometry_shader(&self, geometry_shader: Option<&str>) {
         let geometry_shader = geometry_shader.and_then(cstring_from_str);
         unsafe {
@@ -394,11 +420,13 @@ impl Program {
         };
     }
 
+    /// Mirrors `SCNProgram.tessellationControlShader`.
     #[must_use]
     pub fn tessellation_control_shader(&self) -> Option<String> {
         unsafe { take_string(ffi::scn_program_copy_tessellation_control_shader(self.ptr)) }
     }
 
+    /// Sets the `SCNProgram.tessellationControlShader` member.
     pub fn set_tessellation_control_shader(&self, tessellation_control_shader: Option<&str>) {
         let tessellation_control_shader = tessellation_control_shader.and_then(cstring_from_str);
         unsafe {
@@ -411,6 +439,7 @@ impl Program {
         };
     }
 
+    /// Mirrors `SCNProgram.tessellationEvaluationShader`.
     #[must_use]
     pub fn tessellation_evaluation_shader(&self) -> Option<String> {
         unsafe {
@@ -420,6 +449,7 @@ impl Program {
         }
     }
 
+    /// Sets the `SCNProgram.tessellationEvaluationShader` member.
     pub fn set_tessellation_evaluation_shader(&self, tessellation_evaluation_shader: Option<&str>) {
         let tessellation_evaluation_shader =
             tessellation_evaluation_shader.and_then(cstring_from_str);
@@ -433,11 +463,13 @@ impl Program {
         };
     }
 
+    /// Mirrors `SCNProgram.vertexFunctionName`.
     #[must_use]
     pub fn vertex_function_name(&self) -> Option<String> {
         unsafe { take_string(ffi::scn_program_copy_vertex_function_name(self.ptr)) }
     }
 
+    /// Sets the `SCNProgram.vertexFunctionName` member.
     pub fn set_vertex_function_name(&self, vertex_function_name: Option<&str>) {
         let vertex_function_name = vertex_function_name.and_then(cstring_from_str);
         unsafe {
@@ -450,11 +482,13 @@ impl Program {
         };
     }
 
+    /// Mirrors `SCNProgram.fragmentFunctionName`.
     #[must_use]
     pub fn fragment_function_name(&self) -> Option<String> {
         unsafe { take_string(ffi::scn_program_copy_fragment_function_name(self.ptr)) }
     }
 
+    /// Sets the `SCNProgram.fragmentFunctionName` member.
     pub fn set_fragment_function_name(&self, fragment_function_name: Option<&str>) {
         let fragment_function_name = fragment_function_name.and_then(cstring_from_str);
         unsafe {
@@ -467,15 +501,18 @@ impl Program {
         };
     }
 
+    /// Mirrors `SCNProgram.opaque`.
     #[must_use]
     pub fn opaque(&self) -> bool {
         unsafe { ffi::scn_program_get_opaque(self.ptr) }
     }
 
+    /// Sets the `SCNProgram.opaque` member.
     pub fn set_opaque(&self, opaque: bool) {
         unsafe { ffi::scn_program_set_opaque(self.ptr, opaque) };
     }
 
+    /// Sets the `SCNProgram.semantic` member.
     pub fn set_semantic(
         &self,
         semantic: Option<&str>,
@@ -499,6 +536,7 @@ impl Program {
         };
     }
 
+    /// Mirrors `SCNProgram.semanticForSymbol`.
     #[must_use]
     pub fn semantic_for_symbol(&self, symbol: &str) -> Option<String> {
         let symbol = cstring_from_str(symbol)?;
@@ -510,6 +548,7 @@ impl Program {
         }
     }
 
+    /// Sets the `SCNProgram.delegate` member.
     pub fn set_delegate(&self, delegate: Option<&ProgramDelegate>) {
         unsafe {
             ffi::scn_program_set_delegate(
@@ -519,6 +558,7 @@ impl Program {
         };
     }
 
+    /// Sets the `SCNProgram.bufferBinding` member.
     pub fn set_buffer_binding(
         &self,
         name: &str,

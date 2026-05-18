@@ -72,6 +72,7 @@ extern "C" {
 
 macro_rules! geometry_newtype {
     ($name:ident) => {
+        #[doc = concat!("Wraps `SCN", stringify!($name), "`.")]
         pub struct $name(Geometry);
 
         impl core::fmt::Debug for $name {
@@ -104,6 +105,7 @@ macro_rules! geometry_newtype {
 
 macro_rules! node_newtype {
     ($name:ident) => {
+        #[doc = concat!("Wraps `SCN", stringify!($name), "`.")]
         pub struct $name(Node);
 
         impl core::fmt::Debug for $name {
@@ -150,6 +152,7 @@ handle_type!(ParticlePropertyController);
 handle_type!(Skinner);
 
 impl Pyramid {
+    /// Creates a wrapped `SCNPyramid` instance.
     #[must_use]
     pub fn new(width: f64, height: f64, length: f64) -> Option<Self> {
         unsafe { Self::from_raw(scn_geometry_new_pyramid(width, height, length)) }
@@ -157,6 +160,7 @@ impl Pyramid {
 }
 
 impl Tube {
+    /// Creates a wrapped `SCNTube` instance.
     #[must_use]
     pub fn new(inner_radius: f64, outer_radius: f64, height: f64) -> Option<Self> {
         unsafe { Self::from_raw(scn_geometry_new_tube(inner_radius, outer_radius, height)) }
@@ -164,6 +168,7 @@ impl Tube {
 }
 
 impl Capsule {
+    /// Creates a wrapped `SCNCapsule` instance.
     #[must_use]
     pub fn new(cap_radius: f64, height: f64) -> Option<Self> {
         unsafe { Self::from_raw(scn_geometry_new_capsule(cap_radius, height)) }
@@ -171,6 +176,7 @@ impl Capsule {
 }
 
 impl Torus {
+    /// Creates a wrapped `SCNTorus` instance.
     #[must_use]
     pub fn new(ring_radius: f64, pipe_radius: f64) -> Option<Self> {
         unsafe { Self::from_raw(scn_geometry_new_torus(ring_radius, pipe_radius)) }
@@ -178,6 +184,7 @@ impl Torus {
 }
 
 impl Shape {
+    /// Mirrors `SCNShape.withExtrusionDepth`.
     #[must_use]
     pub fn with_extrusion_depth(extrusion_depth: f64) -> Option<Self> {
         unsafe { Self::from_raw(scn_geometry_new_shape(extrusion_depth)) }
@@ -185,6 +192,7 @@ impl Shape {
 }
 
 impl GeometrySource {
+    /// Mirrors `SCNGeometrySource.withVertices`.
     #[must_use]
     pub fn with_vertices(vertices: &[Vector3]) -> Option<Self> {
         unsafe {
@@ -195,6 +203,7 @@ impl GeometrySource {
         }
     }
 
+    /// Mirrors `SCNGeometrySource.withNormals`.
     #[must_use]
     pub fn with_normals(normals: &[Vector3]) -> Option<Self> {
         unsafe {
@@ -205,6 +214,7 @@ impl GeometrySource {
         }
     }
 
+    /// Mirrors `SCNGeometrySource.withTextureCoordinates`.
     #[must_use]
     pub fn with_texture_coordinates(texcoords: &[crate::CGPoint]) -> Option<Self> {
         unsafe {
@@ -217,6 +227,7 @@ impl GeometrySource {
 }
 
 impl GeometryElement {
+    /// Mirrors `SCNGeometryElement.withData`.
     #[must_use]
     pub fn with_data(
         data: Option<&[u8]>,
@@ -237,6 +248,7 @@ impl GeometryElement {
 }
 
 impl Geometry {
+    /// Mirrors `SCNGeometry.withSourcesElements`.
     #[must_use]
     pub fn with_sources_elements(
         sources: &[&GeometrySource],
@@ -264,11 +276,13 @@ impl Geometry {
         }
     }
 
+    /// Mirrors `SCNGeometry.tessellator`.
     #[must_use]
     pub fn tessellator(&self) -> Option<GeometryTessellator> {
         unsafe { GeometryTessellator::from_raw(scn_geometry_get_tessellator(self.as_ptr())) }
     }
 
+    /// Sets the `SCNGeometry.tessellator` member.
     pub fn set_tessellator(&self, tessellator: Option<&GeometryTessellator>) {
         unsafe {
             scn_geometry_set_tessellator(
@@ -278,6 +292,7 @@ impl Geometry {
         };
     }
 
+    /// Sets the `SCNGeometry.levelsOfDetail` member.
     pub fn set_levels_of_detail(&self, levels_of_detail: &[&LevelOfDetail]) {
         let mut level_ptrs: Vec<*mut c_void> = levels_of_detail
             .iter()
@@ -296,6 +311,7 @@ impl Geometry {
         };
     }
 
+    /// Mirrors `SCNGeometry.levelsOfDetailCount`.
     #[must_use]
     pub fn levels_of_detail_count(&self) -> usize {
         unsafe { scn_geometry_levels_of_detail_count(self.as_ptr()) }
@@ -303,6 +319,7 @@ impl Geometry {
 }
 
 impl GeometryTessellator {
+    /// Creates a wrapped `SCNGeometryTessellator` instance.
     #[must_use]
     pub fn new() -> Option<Self> {
         unsafe { Self::from_raw(scn_geometry_tessellator_new()) }
@@ -310,6 +327,7 @@ impl GeometryTessellator {
 }
 
 impl LevelOfDetail {
+    /// Mirrors `SCNLevelOfDetail.withScreenSpaceRadius`.
     #[must_use]
     pub fn with_screen_space_radius(geometry: Option<&Geometry>, radius: f64) -> Option<Self> {
         unsafe {
@@ -320,6 +338,7 @@ impl LevelOfDetail {
         }
     }
 
+    /// Mirrors `SCNLevelOfDetail.withWorldSpaceDistance`.
     #[must_use]
     pub fn with_world_space_distance(geometry: Option<&Geometry>, distance: f64) -> Option<Self> {
         unsafe {
@@ -332,11 +351,13 @@ impl LevelOfDetail {
 }
 
 impl Morpher {
+    /// Creates a wrapped `SCNMorpher` instance.
     #[must_use]
     pub fn new() -> Option<Self> {
         unsafe { Self::from_raw(scn_morpher_new()) }
     }
 
+    /// Mirrors `SCNMorpher.calculationMode`.
     #[must_use]
     pub fn calculation_mode(&self) -> MorpherCalculationMode {
         match unsafe { scn_morpher_get_calculation_mode(self.as_ptr()) } {
@@ -345,12 +366,14 @@ impl Morpher {
         }
     }
 
+    /// Sets the `SCNMorpher.calculationMode` member.
     pub fn set_calculation_mode(&self, calculation_mode: MorpherCalculationMode) {
         unsafe { scn_morpher_set_calculation_mode(self.as_ptr(), calculation_mode as i32) };
     }
 }
 
 impl ParticlePropertyController {
+    /// Mirrors `SCNParticlePropertyController.withAnimation`.
     #[must_use]
     pub fn with_animation(animation: &Animation) -> Option<Self> {
         unsafe {
@@ -360,6 +383,7 @@ impl ParticlePropertyController {
         }
     }
 
+    /// Mirrors `SCNParticlePropertyController.inputMode`.
     #[must_use]
     pub fn input_mode(&self) -> ParticleInputMode {
         match unsafe { scn_particle_property_controller_get_input_mode(self.as_ptr()) } {
@@ -369,6 +393,7 @@ impl ParticlePropertyController {
         }
     }
 
+    /// Sets the `SCNParticlePropertyController.inputMode` member.
     pub fn set_input_mode(&self, input_mode: ParticleInputMode) {
         unsafe {
             scn_particle_property_controller_set_input_mode(self.as_ptr(), input_mode as i32);
@@ -377,12 +402,14 @@ impl ParticlePropertyController {
 }
 
 impl ReferenceNode {
+    /// Mirrors `SCNReferenceNode.withUrl`.
     #[must_use]
     pub fn with_url(path: impl AsRef<Path>) -> Option<Self> {
         let path = cstring_from_path(path.as_ref())?;
         unsafe { Self::from_raw(scn_reference_node_new_url(path.as_ptr())) }
     }
 
+    /// Mirrors `SCNReferenceNode.loadingPolicy`.
     #[must_use]
     pub fn loading_policy(&self) -> ReferenceLoadingPolicy {
         match unsafe { scn_reference_node_get_loading_policy(self.as_ptr()) } {
@@ -391,18 +418,22 @@ impl ReferenceNode {
         }
     }
 
+    /// Sets the `SCNReferenceNode.loadingPolicy` member.
     pub fn set_loading_policy(&self, loading_policy: ReferenceLoadingPolicy) {
         unsafe { scn_reference_node_set_loading_policy(self.as_ptr(), loading_policy as i32) };
     }
 
+    /// Mirrors `SCNReferenceNode.loadReference`.
     pub fn load_reference(&self) {
         unsafe { scn_reference_node_load(self.as_ptr()) };
     }
 
+    /// Mirrors `SCNReferenceNode.unloadReference`.
     pub fn unload_reference(&self) {
         unsafe { scn_reference_node_unload(self.as_ptr()) };
     }
 
+    /// Returns the `SCNReferenceNode.isLoaded` value.
     #[must_use]
     pub fn is_loaded(&self) -> bool {
         unsafe { scn_reference_node_get_loaded(self.as_ptr()) }
@@ -410,6 +441,7 @@ impl ReferenceNode {
 }
 
 impl Skinner {
+    /// Creates a wrapped `SCNSkinner` instance.
     #[must_use]
     pub fn new(
         base_geometry: Option<&Geometry>,
@@ -435,11 +467,13 @@ impl Skinner {
 }
 
 impl Node {
+    /// Mirrors `SCNNode.morpher`.
     #[must_use]
     pub fn morpher(&self) -> Option<Morpher> {
         unsafe { Morpher::from_raw(scn_node_get_morpher(self.as_ptr())) }
     }
 
+    /// Sets the `SCNNode.morpher` member.
     pub fn set_morpher(&self, morpher: Option<&Morpher>) {
         unsafe {
             scn_node_set_morpher(
@@ -449,11 +483,13 @@ impl Node {
         };
     }
 
+    /// Mirrors `SCNNode.skinner`.
     #[must_use]
     pub fn skinner(&self) -> Option<Skinner> {
         unsafe { Skinner::from_raw(scn_node_get_skinner(self.as_ptr())) }
     }
 
+    /// Sets the `SCNNode.skinner` member.
     pub fn set_skinner(&self, skinner: Option<&Skinner>) {
         unsafe {
             scn_node_set_skinner(

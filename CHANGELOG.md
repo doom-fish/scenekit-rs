@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.7] - 2026-05-18
+
+- Added one-line rustdoc coverage across the public SceneKit wrapper surface, lifting the crate from an undocumented API surface to a fully documented one for rustc `missing_docs` checks.
+- Documented helper newtypes, protocol bridges, constants, and module exports with SceneKit counterpart references.
+
 ## [0.2.6] - 2026-05-18
 
 - Widen apple-cf version bound to `<0.10` so 0.9.x resolves.

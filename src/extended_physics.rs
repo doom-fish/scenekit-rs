@@ -104,6 +104,7 @@ handle_type!(PhysicsVehicleWheel);
 
 macro_rules! physics_behavior_newtype {
     ($name:ident) => {
+        #[doc = concat!("Wraps `SCN", stringify!($name), "`.")]
         pub struct $name(PhysicsBehavior);
 
         impl core::fmt::Debug for $name {
@@ -141,11 +142,13 @@ physics_behavior_newtype!(PhysicsConeTwistJoint);
 physics_behavior_newtype!(PhysicsVehicle);
 
 impl PhysicsShape {
+    /// Mirrors `SCNPhysicsShape.withGeometry`.
     #[must_use]
     pub fn with_geometry(geometry: &Geometry) -> Option<Self> {
         unsafe { Self::from_raw(scn_physics_shape_new_with_geometry(geometry.as_ptr())) }
     }
 
+    /// Mirrors `SCNPhysicsShape.withNode`.
     #[must_use]
     pub fn with_node(node: &Node) -> Option<Self> {
         unsafe { Self::from_raw(scn_physics_shape_new_with_node(node.as_ptr())) }
@@ -153,11 +156,13 @@ impl PhysicsShape {
 }
 
 impl PhysicsBody {
+    /// Mirrors `SCNPhysicsBody.physicsShape`.
     #[must_use]
     pub fn physics_shape(&self) -> Option<PhysicsShape> {
         unsafe { PhysicsShape::from_raw(scn_physics_body_get_shape(self.as_ptr())) }
     }
 
+    /// Sets the `SCNPhysicsBody.physicsShape` member.
     pub fn set_physics_shape(&self, physics_shape: Option<&PhysicsShape>) {
         unsafe {
             scn_physics_body_set_shape(
@@ -169,26 +174,31 @@ impl PhysicsBody {
 }
 
 impl PhysicsField {
+    /// Mirrors `SCNPhysicsField.drag`.
     #[must_use]
     pub fn drag() -> Option<Self> {
         unsafe { Self::from_raw(scn_physics_field_drag()) }
     }
 
+    /// Mirrors `SCNPhysicsField.vortex`.
     #[must_use]
     pub fn vortex() -> Option<Self> {
         unsafe { Self::from_raw(scn_physics_field_vortex()) }
     }
 
+    /// Mirrors `SCNPhysicsField.radialGravity`.
     #[must_use]
     pub fn radial_gravity() -> Option<Self> {
         unsafe { Self::from_raw(scn_physics_field_radial_gravity()) }
     }
 
+    /// Mirrors `SCNPhysicsField.linearGravity`.
     #[must_use]
     pub fn linear_gravity() -> Option<Self> {
         unsafe { Self::from_raw(scn_physics_field_linear_gravity()) }
     }
 
+    /// Mirrors `SCNPhysicsField.scope`.
     #[must_use]
     pub fn scope(&self) -> PhysicsFieldScope {
         match unsafe { scn_physics_field_get_scope(self.as_ptr()) } {
@@ -197,31 +207,37 @@ impl PhysicsField {
         }
     }
 
+    /// Sets the `SCNPhysicsField.scope` member.
     pub fn set_scope(&self, scope: PhysicsFieldScope) {
         unsafe { scn_physics_field_set_scope(self.as_ptr(), scope as i32) };
     }
 }
 
 impl PhysicsWorld {
+    /// Mirrors `SCNPhysicsWorld.addBehavior`.
     pub fn add_behavior(&self, behavior: &PhysicsBehavior) {
         unsafe { scn_physics_world_add_behavior(self.as_ptr(), behavior.as_ptr()) };
     }
 
+    /// Mirrors `SCNPhysicsWorld.removeBehavior`.
     pub fn remove_behavior(&self, behavior: &PhysicsBehavior) {
         unsafe { scn_physics_world_remove_behavior(self.as_ptr(), behavior.as_ptr()) };
     }
 
+    /// Mirrors `SCNPhysicsWorld.removeAllBehaviors`.
     pub fn remove_all_behaviors(&self) {
         unsafe { scn_physics_world_remove_all_behaviors(self.as_ptr()) };
     }
 }
 
 impl Node {
+    /// Mirrors `SCNNode.physicsField`.
     #[must_use]
     pub fn physics_field(&self) -> Option<PhysicsField> {
         unsafe { PhysicsField::from_raw(scn_node_get_physics_field(self.as_ptr())) }
     }
 
+    /// Sets the `SCNNode.physicsField` member.
     pub fn set_physics_field(&self, field: Option<&PhysicsField>) {
         unsafe {
             scn_node_set_physics_field(
@@ -233,6 +249,7 @@ impl Node {
 }
 
 impl PhysicsBallSocketJoint {
+    /// Creates a wrapped `SCNPhysicsBallSocketJoint` instance.
     #[must_use]
     pub fn new(
         body_a: &PhysicsBody,
@@ -252,6 +269,7 @@ impl PhysicsBallSocketJoint {
         }
     }
 
+    /// Mirrors `SCNPhysicsBallSocketJoint.withAnchor`.
     #[must_use]
     pub fn with_anchor(body: &PhysicsBody, anchor: Vector3) -> Option<Self> {
         let mut anchor = anchor;
@@ -265,6 +283,7 @@ impl PhysicsBallSocketJoint {
 }
 
 impl PhysicsHingeJoint {
+    /// Creates a wrapped `SCNPhysicsHingeJoint` instance.
     #[must_use]
     pub fn new(
         body_a: &PhysicsBody,
@@ -290,6 +309,7 @@ impl PhysicsHingeJoint {
         }
     }
 
+    /// Mirrors `SCNPhysicsHingeJoint.withAnchor`.
     #[must_use]
     pub fn with_anchor(body: &PhysicsBody, axis: Vector3, anchor: Vector3) -> Option<Self> {
         let mut axis = axis;
@@ -305,6 +325,7 @@ impl PhysicsHingeJoint {
 }
 
 impl PhysicsSliderJoint {
+    /// Creates a wrapped `SCNPhysicsSliderJoint` instance.
     #[must_use]
     pub fn new(
         body_a: &PhysicsBody,
@@ -330,6 +351,7 @@ impl PhysicsSliderJoint {
         }
     }
 
+    /// Mirrors `SCNPhysicsSliderJoint.withAnchor`.
     #[must_use]
     pub fn with_anchor(body: &PhysicsBody, axis: Vector3, anchor: Vector3) -> Option<Self> {
         let mut axis = axis;
@@ -345,6 +367,7 @@ impl PhysicsSliderJoint {
 }
 
 impl PhysicsConeTwistJoint {
+    /// Creates a wrapped `SCNPhysicsConeTwistJoint` instance.
     #[must_use]
     pub fn new(
         body_a: &PhysicsBody,
@@ -364,6 +387,7 @@ impl PhysicsConeTwistJoint {
         }
     }
 
+    /// Mirrors `SCNPhysicsConeTwistJoint.withFrame`.
     #[must_use]
     pub fn with_frame(body: &PhysicsBody, frame: Matrix4) -> Option<Self> {
         let mut frame = frame;
@@ -377,6 +401,7 @@ impl PhysicsConeTwistJoint {
 }
 
 impl PhysicsVehicleWheel {
+    /// Mirrors `SCNPhysicsVehicleWheel.withNode`.
     #[must_use]
     pub fn with_node(node: &Node) -> Option<Self> {
         unsafe { Self::from_raw(scn_physics_vehicle_wheel_new(node.as_ptr())) }
@@ -384,6 +409,7 @@ impl PhysicsVehicleWheel {
 }
 
 impl PhysicsVehicle {
+    /// Creates a wrapped `SCNPhysicsVehicle` instance.
     #[must_use]
     pub fn new(chassis_body: &PhysicsBody, wheels: &[&PhysicsVehicleWheel]) -> Option<Self> {
         let mut wheel_ptrs: Vec<*mut c_void> = wheels.iter().map(|wheel| wheel.as_ptr()).collect();
@@ -400,19 +426,23 @@ impl PhysicsVehicle {
         }
     }
 
+    /// Mirrors `SCNPhysicsVehicle.speedInKilometersPerHour`.
     #[must_use]
     pub fn speed_in_kilometers_per_hour(&self) -> f64 {
         unsafe { scn_physics_vehicle_get_speed_in_kilometers_per_hour(self.as_ptr()) }
     }
 
+    /// Mirrors `SCNPhysicsVehicle.applyEngineForce`.
     pub fn apply_engine_force(&self, value: f64, wheel_index: usize) {
         unsafe { scn_physics_vehicle_apply_engine_force(self.as_ptr(), value, wheel_index) };
     }
 
+    /// Sets the `SCNPhysicsVehicle.steeringAngle` member.
     pub fn set_steering_angle(&self, value: f64, wheel_index: usize) {
         unsafe { scn_physics_vehicle_set_steering_angle(self.as_ptr(), value, wheel_index) };
     }
 
+    /// Mirrors `SCNPhysicsVehicle.applyBrakingForce`.
     pub fn apply_braking_force(&self, value: f64, wheel_index: usize) {
         unsafe { scn_physics_vehicle_apply_braking_force(self.as_ptr(), value, wheel_index) };
     }

@@ -7,22 +7,26 @@ use crate::view::View;
 handle_type!(Technique);
 
 impl Technique {
+    /// Mirrors `SCNTechnique.minimalDrawScene`.
     #[must_use]
     pub fn minimal_draw_scene() -> Option<Self> {
         unsafe { Self::from_raw(ffi::scn_technique_new_minimal_draw_scene()) }
     }
 
+    /// Mirrors `SCNTechnique.dictionaryKeyCount`.
     #[must_use]
     pub fn dictionary_key_count(&self) -> usize {
         unsafe { ffi::scn_technique_dictionary_key_count(self.ptr) }
     }
 
+    /// Sets the `SCNTechnique.floatSymbol` member.
     pub fn set_float_symbol(&self, key: &str, value: f64) {
         if let Some(key) = cstring_from_str(key) {
             unsafe { ffi::scn_technique_set_float_symbol(self.ptr, key.as_ptr(), value) };
         }
     }
 
+    /// Mirrors `SCNTechnique.floatSymbol`.
     #[must_use]
     pub fn float_symbol(&self, key: &str) -> Option<f64> {
         let key = cstring_from_str(key)?;
@@ -33,6 +37,7 @@ impl Technique {
 }
 
 impl View {
+    /// Sets the `SCNView.technique` member.
     pub fn set_technique(&self, technique: Option<&Technique>) {
         unsafe {
             ffi::scn_view_set_technique(
@@ -42,6 +47,7 @@ impl View {
         };
     }
 
+    /// Mirrors `SCNView.technique`.
     #[must_use]
     pub fn technique(&self) -> Option<Technique> {
         unsafe { Technique::from_raw(ffi::scn_view_technique(self.ptr)) }

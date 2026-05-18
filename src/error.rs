@@ -2,12 +2,14 @@ use std::error::Error;
 use std::ffi::CStr;
 use std::fmt;
 
+/// Represents an error surfaced by a SceneKit wrapper call.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SceneKitError {
     message: String,
 }
 
 impl SceneKitError {
+    /// Creates a wrapped `SCNErrorDomain` instance.
     #[must_use]
     pub fn new(message: impl Into<String>) -> Self {
         Self {

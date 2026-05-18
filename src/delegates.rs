@@ -62,17 +62,20 @@ type AvoidOccluderShouldCallback = Box<dyn FnMut(&Node, &Node) -> bool>;
 type AvoidOccluderDidCallback = Box<dyn FnMut(&Node, &Node)>;
 type SceneExportWriteImageCallback = Box<dyn FnMut(&str, Option<&str>) -> Option<String>>;
 
+/// Stores Rust callbacks backing `SCNNodeRendererDelegate`.
 #[derive(Default)]
 pub struct NodeRendererDelegateCallbacks {
     render: Option<NodeRendererCallback>,
 }
 
 impl NodeRendererDelegateCallbacks {
+    /// Creates a wrapped `SCNNodeRendererDelegate` instance.
     #[must_use]
     pub const fn new() -> Self {
         Self { render: None }
     }
 
+    /// Mirrors `SCNNodeRendererDelegate.onRender`.
     #[must_use]
     pub fn on_render<F>(mut self, callback: F) -> Self
     where
@@ -87,6 +90,7 @@ struct NodeRendererDelegateState {
     callbacks: NodeRendererDelegateCallbacks,
 }
 
+/// Wraps `SCNNodeRendererDelegate`.
 pub struct NodeRendererDelegate {
     ptr: *mut c_void,
 }
@@ -142,6 +146,7 @@ extern "C" fn node_renderer_trampoline(
 }
 
 impl NodeRendererDelegate {
+    /// Creates a wrapped `SCNNodeRendererDelegate` instance.
     #[must_use]
     pub fn new(callbacks: NodeRendererDelegateCallbacks) -> Option<Self> {
         let state = Box::new(NodeRendererDelegateState { callbacks });
@@ -161,12 +166,14 @@ impl NodeRendererDelegate {
         }
     }
 
+    /// Returns the Objective-C pointer backing this `SCNNodeRendererDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
         self.ptr
     }
 }
 
+/// Stores Rust callbacks backing `SCNAvoidOccluderConstraintDelegate`.
 #[derive(Default)]
 pub struct AvoidOccluderConstraintDelegateCallbacks {
     should_avoid_occluder: Option<AvoidOccluderShouldCallback>,
@@ -174,6 +181,7 @@ pub struct AvoidOccluderConstraintDelegateCallbacks {
 }
 
 impl AvoidOccluderConstraintDelegateCallbacks {
+    /// Creates a wrapped `SCNAvoidOccluderConstraintDelegate` instance.
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -182,6 +190,7 @@ impl AvoidOccluderConstraintDelegateCallbacks {
         }
     }
 
+    /// Mirrors `SCNAvoidOccluderConstraintDelegate.onShouldAvoidOccluder`.
     #[must_use]
     pub fn on_should_avoid_occluder<F>(mut self, callback: F) -> Self
     where
@@ -191,6 +200,7 @@ impl AvoidOccluderConstraintDelegateCallbacks {
         self
     }
 
+    /// Mirrors `SCNAvoidOccluderConstraintDelegate.onDidAvoidOccluder`.
     #[must_use]
     pub fn on_did_avoid_occluder<F>(mut self, callback: F) -> Self
     where
@@ -205,6 +215,7 @@ struct AvoidOccluderConstraintDelegateState {
     callbacks: AvoidOccluderConstraintDelegateCallbacks,
 }
 
+/// Wraps `SCNAvoidOccluderConstraintDelegate`.
 pub struct AvoidOccluderConstraintDelegate {
     ptr: *mut c_void,
 }
@@ -285,6 +296,7 @@ extern "C" fn avoid_occluder_did_trampoline(
 }
 
 impl AvoidOccluderConstraintDelegate {
+    /// Creates a wrapped `SCNAvoidOccluderConstraintDelegate` instance.
     #[must_use]
     pub fn new(callbacks: AvoidOccluderConstraintDelegateCallbacks) -> Option<Self> {
         let state = Box::new(AvoidOccluderConstraintDelegateState { callbacks });
@@ -305,6 +317,7 @@ impl AvoidOccluderConstraintDelegate {
         }
     }
 
+    /// Returns the Objective-C pointer backing this `SCNAvoidOccluderConstraintDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
         self.ptr
@@ -316,6 +329,7 @@ struct SceneExportDelegateState {
     returned_path: Option<CString>,
 }
 
+/// Wraps `SCNSceneExportDelegate`.
 pub struct SceneExportDelegate {
     ptr: *mut c_void,
 }
@@ -370,8 +384,9 @@ extern "C" fn scene_export_write_image_trampoline(
                 .to_string_lossy()
                 .into_owned()
         });
-        state.returned_path = (state.callback)(document_url.as_str(), original_image_url.as_deref())
-            .and_then(|path| CString::new(path).ok());
+        state.returned_path =
+            (state.callback)(document_url.as_str(), original_image_url.as_deref())
+                .and_then(|path| CString::new(path).ok());
         state
             .returned_path
             .as_ref()
@@ -381,6 +396,7 @@ extern "C" fn scene_export_write_image_trampoline(
 }
 
 impl SceneExportDelegate {
+    /// Creates a wrapped `SCNSceneExportDelegate` instance.
     #[must_use]
     pub fn new<F>(callback: F) -> Option<Self>
     where
@@ -406,6 +422,7 @@ impl SceneExportDelegate {
         }
     }
 
+    /// Returns the Objective-C pointer backing this `SCNSceneExportDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
         self.ptr
@@ -413,6 +430,7 @@ impl SceneExportDelegate {
 }
 
 impl Node {
+    /// Sets the `SCNNode.rendererDelegate` member.
     pub fn set_renderer_delegate(&self, delegate: Option<&NodeRendererDelegate>) {
         unsafe {
             scn_node_set_renderer_delegate(
@@ -422,6 +440,7 @@ impl Node {
         };
     }
 
+    /// Mirrors `SCNNode.rendererDelegate`.
     #[must_use]
     pub fn renderer_delegate(&self) -> Option<NodeRendererDelegate> {
         unsafe {
@@ -432,12 +451,14 @@ impl Node {
         }
     }
 
+    /// Mirrors `SCNNode.testInvokeRendererDelegate`.
     pub fn test_invoke_renderer_delegate(&self, renderer: &Renderer) {
         unsafe { scn_node_test_invoke_renderer_delegate(self.as_ptr(), renderer.as_ptr()) };
     }
 }
 
 impl AvoidOccluderConstraint {
+    /// Sets the `SCNAvoidOccluderConstraint.delegate` member.
     pub fn set_delegate(&self, delegate: Option<&AvoidOccluderConstraintDelegate>) {
         unsafe {
             scn_avoid_occluder_constraint_set_delegate(
@@ -447,6 +468,7 @@ impl AvoidOccluderConstraint {
         };
     }
 
+    /// Mirrors `SCNAvoidOccluderConstraint.delegate`.
     #[must_use]
     pub fn delegate(&self) -> Option<AvoidOccluderConstraintDelegate> {
         unsafe {
@@ -457,6 +479,7 @@ impl AvoidOccluderConstraint {
         }
     }
 
+    /// Mirrors `SCNAvoidOccluderConstraint.testInvokeShouldAvoidOccluder`.
     #[must_use]
     pub fn test_invoke_should_avoid_occluder(&self, occluder: &Node, node: &Node) -> bool {
         unsafe {
@@ -468,6 +491,7 @@ impl AvoidOccluderConstraint {
         }
     }
 
+    /// Mirrors `SCNAvoidOccluderConstraint.testInvokeDidAvoidOccluder`.
     pub fn test_invoke_did_avoid_occluder(&self, occluder: &Node, node: &Node) {
         unsafe {
             scn_avoid_occluder_constraint_test_invoke_did(
@@ -480,6 +504,7 @@ impl AvoidOccluderConstraint {
 }
 
 impl Scene {
+    /// Mirrors `SCNScene.writeToUrl`.
     #[must_use]
     pub fn write_to_url(
         &self,

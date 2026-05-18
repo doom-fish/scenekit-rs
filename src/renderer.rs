@@ -8,31 +8,41 @@ use crate::node::Node;
 use crate::private::handle_type;
 use crate::scene::Scene;
 
-handle_type!(RenderPassDescriptor);
+handle_type!(RenderPassDescriptor, "MTLRenderPassDescriptor");
 handle_type!(Renderer);
 
+/// Mirrors the Metal load actions used by `SCNRenderer` render passes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum LoadAction {
+    /// Corresponds to the `MTLLoadAction::DontCare` case.
     DontCare = 0,
+    /// Corresponds to the `MTLLoadAction::Load` case.
     Load = 1,
+    /// Corresponds to the `MTLLoadAction::Clear` case.
     Clear = 2,
 }
 
+/// Mirrors the Metal store actions used by `SCNRenderer` render passes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum StoreAction {
+    /// Corresponds to the `MTLStoreAction::DontCare` case.
     DontCare = 0,
+    /// Corresponds to the `MTLStoreAction::Store` case.
     Store = 1,
+    /// Corresponds to the `MTLStoreAction::MultisampleResolve` case.
     MultisampleResolve = 2,
 }
 
 impl RenderPassDescriptor {
+    /// Mirrors `SCNRenderer render-pass setup.forTexture`.
     #[must_use]
     pub fn for_texture(texture: &MetalTexture, clear_color: Color) -> Option<Self> {
         Self::for_texture_with_actions(texture, clear_color, LoadAction::Clear, StoreAction::Store)
     }
 
+    /// Mirrors `SCNRenderer render-pass setup.forTextureWithActions`.
     #[must_use]
     pub fn for_texture_with_actions(
         texture: &MetalTexture,
@@ -55,6 +65,7 @@ impl RenderPassDescriptor {
 }
 
 impl Renderer {
+    /// Creates a wrapped `SCNRenderer` instance.
     #[must_use]
     pub fn new(device: Option<&MetalDevice>) -> Option<Self> {
         unsafe {
@@ -64,6 +75,7 @@ impl Renderer {
         }
     }
 
+    /// Sets the `SCNRenderer.scene` member.
     pub fn set_scene(&self, scene: Option<&Scene>) {
         unsafe {
             ffi::scn_renderer_set_scene(
@@ -73,6 +85,7 @@ impl Renderer {
         };
     }
 
+    /// Sets the `SCNRenderer.pointOfView` member.
     pub fn set_point_of_view(&self, point_of_view: Option<&Node>) {
         unsafe {
             ffi::scn_renderer_set_point_of_view(
@@ -82,6 +95,7 @@ impl Renderer {
         };
     }
 
+    /// Mirrors `SCNRenderer.render`.
     pub fn render(
         &self,
         at_time: f64,
@@ -104,6 +118,7 @@ impl Renderer {
     }
 }
 
+/// Reads RGBA bytes back from a texture filled by `SCNRenderer`.
 pub fn read_texture_bytes(texture: &MetalTexture) -> Result<Vec<u8>, SceneKitError> {
     let width = texture.width();
     let height = texture.height();

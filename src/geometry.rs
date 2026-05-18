@@ -7,6 +7,7 @@ use crate::private::{cstring_from_str, handle_type};
 handle_type!(Geometry);
 
 impl Geometry {
+    /// Mirrors `SCNGeometry.boxGeometry`.
     #[must_use]
     pub fn box_geometry(width: f64, height: f64, length: f64, chamfer_radius: f64) -> Option<Self> {
         unsafe {
@@ -19,16 +20,19 @@ impl Geometry {
         }
     }
 
+    /// Mirrors `SCNGeometry.sphere`.
     #[must_use]
     pub fn sphere(radius: f64) -> Option<Self> {
         unsafe { Self::from_raw(ffi::scn_geometry_new_sphere(radius)) }
     }
 
+    /// Mirrors `SCNGeometry.cylinder`.
     #[must_use]
     pub fn cylinder(radius: f64, height: f64) -> Option<Self> {
         unsafe { Self::from_raw(ffi::scn_geometry_new_cylinder(radius, height)) }
     }
 
+    /// Mirrors `SCNGeometry.cone`.
     #[must_use]
     pub fn cone(top_radius: f64, bottom_radius: f64, height: f64) -> Option<Self> {
         unsafe {
@@ -40,16 +44,19 @@ impl Geometry {
         }
     }
 
+    /// Mirrors `SCNGeometry.plane`.
     #[must_use]
     pub fn plane(width: f64, height: f64) -> Option<Self> {
         unsafe { Self::from_raw(ffi::scn_geometry_new_plane(width, height)) }
     }
 
+    /// Mirrors `SCNGeometry.floor`.
     #[must_use]
     pub fn floor() -> Option<Self> {
         unsafe { Self::from_raw(ffi::scn_geometry_new_floor()) }
     }
 
+    /// Mirrors `SCNGeometry.text`.
     #[must_use]
     pub fn text(text: &str, extrusion_depth: f64) -> Option<Self> {
         let text = cstring_from_str(text)?;
@@ -66,11 +73,13 @@ impl Geometry {
         Self::from_raw(ffi::scn_geometry_new_from_mdl_mesh(mesh))
     }
 
+    /// Mirrors `SCNGeometry.firstMaterial`.
     #[must_use]
     pub fn first_material(&self) -> Option<Material> {
         unsafe { Material::from_raw(ffi::scn_geometry_first_material(self.ptr)) }
     }
 
+    /// Sets the `SCNGeometry.firstMaterial` member.
     pub fn set_first_material(&self, material: Option<&Material>) {
         unsafe {
             ffi::scn_geometry_set_first_material(

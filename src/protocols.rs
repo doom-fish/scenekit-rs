@@ -76,7 +76,7 @@ extern "C" {
     ) -> *mut c_void;
 }
 
-handle_type!(StringArray);
+handle_type!(StringArray, "NSArray<NSString>");
 handle_type!(TimingFunction);
 handle_type!(AnimationEvent);
 
@@ -88,13 +88,17 @@ impl StringArray {
     }
 }
 
+/// Mirrors the `SCNActionable` protocol.
 pub trait Actionable: Sealed {
+    /// Returns the raw pointer used to drive the `SCNActionable` protocol surface.
     fn actionable_ptr(&self) -> *mut c_void;
 
+    /// Mirrors the `SCNActionable.runAction` protocol requirement.
     fn run_action(&self, action: &Action) {
         unsafe { crate::ffi::scn_node_run_action(self.actionable_ptr(), action.as_ptr()) };
     }
 
+    /// Mirrors the `SCNActionable.runActionForKey` protocol requirement.
     fn run_action_for_key(&self, action: &Action, key: &str) {
         if let Some(key) = cstring_from_str(key) {
             unsafe {
@@ -107,11 +111,13 @@ pub trait Actionable: Sealed {
         }
     }
 
+    /// Mirrors the `SCNActionable.hasActions` protocol requirement.
     #[must_use]
     fn has_actions(&self) -> bool {
         unsafe { scn_actionable_has_actions(self.actionable_ptr()) }
     }
 
+    /// Mirrors the `SCNActionable.actionForKey` protocol requirement.
     #[must_use]
     fn action_for_key(&self, key: &str) -> Option<Action> {
         let key = cstring_from_str(key)?;
@@ -123,16 +129,19 @@ pub trait Actionable: Sealed {
         }
     }
 
+    /// Mirrors the `SCNActionable.removeActionForKey` protocol requirement.
     fn remove_action_for_key(&self, key: &str) {
         if let Some(key) = cstring_from_str(key) {
             unsafe { scn_actionable_remove_action_for_key(self.actionable_ptr(), key.as_ptr()) };
         }
     }
 
+    /// Mirrors the `SCNActionable.removeAllActions` protocol requirement.
     fn remove_all_actions(&self) {
         unsafe { scn_actionable_remove_all_actions(self.actionable_ptr()) };
     }
 
+    /// Mirrors the `SCNActionable.actionKeys` protocol requirement.
     #[must_use]
     fn action_keys(&self) -> Vec<String> {
         unsafe { StringArray::from_raw(scn_actionable_action_keys(self.actionable_ptr())) }
@@ -140,9 +149,12 @@ pub trait Actionable: Sealed {
     }
 }
 
+/// Mirrors the `SCNAnimatable` protocol.
 pub trait Animatable: Sealed {
+    /// Returns the raw pointer used to drive the `SCNAnimatable` protocol surface.
     fn animatable_ptr(&self) -> *mut c_void;
 
+    /// Mirrors the `SCNAnimatable.addAnimation` protocol requirement.
     fn add_animation(&self, animation: &Animation, key: Option<&str>) {
         let key = key.and_then(cstring_from_str);
         unsafe {
@@ -154,6 +166,7 @@ pub trait Animatable: Sealed {
         };
     }
 
+    /// Mirrors the `SCNAnimatable.addAnimationPlayer` protocol requirement.
     fn add_animation_player(&self, player: &AnimationPlayer, key: Option<&str>) {
         let key = key.and_then(cstring_from_str);
         unsafe {
@@ -165,16 +178,19 @@ pub trait Animatable: Sealed {
         };
     }
 
+    /// Mirrors the `SCNAnimatable.removeAllAnimations` protocol requirement.
     fn remove_all_animations(&self) {
         unsafe { scn_animatable_remove_all_animations(self.animatable_ptr()) };
     }
 
+    /// Mirrors the `SCNAnimatable.removeAnimationForKey` protocol requirement.
     fn remove_animation_for_key(&self, key: &str) {
         if let Some(key) = cstring_from_str(key) {
             unsafe { scn_animatable_remove_animation_for_key(self.animatable_ptr(), key.as_ptr()) };
         }
     }
 
+    /// Mirrors the `SCNAnimatable.animationPlayer` protocol requirement.
     #[must_use]
     fn animation_player(&self, key: &str) -> Option<AnimationPlayer> {
         let key = cstring_from_str(key)?;
@@ -186,6 +202,7 @@ pub trait Animatable: Sealed {
         }
     }
 
+    /// Mirrors the `SCNAnimatable.animationKeys` protocol requirement.
     #[must_use]
     fn animation_keys(&self) -> Vec<String> {
         unsafe { StringArray::from_raw(scn_animatable_animation_keys(self.animatable_ptr())) }
@@ -193,9 +210,12 @@ pub trait Animatable: Sealed {
     }
 }
 
+/// Mirrors the `SCNBoundingVolume` protocol.
 pub trait BoundingVolume: Sealed {
+    /// Returns the raw pointer used to drive the `SCNBoundingVolume` protocol surface.
     fn bounding_volume_ptr(&self) -> *mut c_void;
 
+    /// Mirrors the `SCNBoundingVolume.boundingBox` protocol requirement.
     #[must_use]
     fn bounding_box(&self) -> Option<(Vector3, Vector3)> {
         let mut min = Vector3::default();
@@ -210,6 +230,7 @@ pub trait BoundingVolume: Sealed {
         ok.then_some((min, max))
     }
 
+    /// Sets the `SCNBoundingVolume.boundingBox` member.
     fn set_bounding_box(&self, bounding_box: Option<(Vector3, Vector3)>) {
         match bounding_box {
             Some((mut min, mut max)) => unsafe {
@@ -229,6 +250,7 @@ pub trait BoundingVolume: Sealed {
         }
     }
 
+    /// Mirrors the `SCNBoundingVolume.boundingSphere` protocol requirement.
     #[must_use]
     fn bounding_sphere(&self) -> Option<(Vector3, f64)> {
         let mut center = Vector3::default();
@@ -244,9 +266,12 @@ pub trait BoundingVolume: Sealed {
     }
 }
 
+/// Mirrors the `SCNTechniqueSupport` protocol.
 pub trait TechniqueSupport: Sealed {
+    /// Returns the raw pointer used to drive the `SCNTechniqueSupport` protocol surface.
     fn technique_support_ptr(&self) -> *mut c_void;
 
+    /// Mirrors the `SCNTechniqueSupport.technique` protocol requirement.
     #[must_use]
     fn technique(&self) -> Option<Technique> {
         unsafe {
@@ -256,6 +281,7 @@ pub trait TechniqueSupport: Sealed {
         }
     }
 
+    /// Sets the `SCNTechniqueSupport.technique` member.
     fn set_technique(&self, technique: Option<&Technique>) {
         unsafe {
             scn_technique_support_set_technique(
@@ -267,6 +293,7 @@ pub trait TechniqueSupport: Sealed {
 }
 
 impl TimingFunction {
+    /// Mirrors `SCNTimingFunction.withTimingMode`.
     #[must_use]
     pub fn with_timing_mode(mode: crate::symbols::ActionTimingMode) -> Option<Self> {
         unsafe { Self::from_raw(scn_timing_function_new_mode(mode as i32)) }
@@ -305,6 +332,7 @@ extern "C" fn animation_event_trampoline(context: *mut c_void, playing_backward:
 }
 
 impl AnimationEvent {
+    /// Creates a wrapped `SCNAnimationEvent` instance.
     #[must_use]
     pub fn new<F>(key_time: f32, callback: F) -> Option<Self>
     where

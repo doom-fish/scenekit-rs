@@ -12,15 +12,23 @@ use crate::{CGPoint, CGSize};
 handle_type!(CameraController);
 handle_type!(CameraControlConfiguration);
 
+/// Mirrors the interaction modes used by `SCNCameraController`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum InteractionMode {
+    /// Corresponds to the `SCNCameraController.interactionMode::Fly` case.
     Fly = 0,
+    /// Corresponds to the `SCNCameraController.interactionMode::OrbitTurntable` case.
     OrbitTurntable = 1,
+    /// Corresponds to the `SCNCameraController.interactionMode::OrbitAngleMapping` case.
     OrbitAngleMapping = 2,
+    /// Corresponds to the `SCNCameraController.interactionMode::OrbitCenteredArcball` case.
     OrbitCenteredArcball = 3,
+    /// Corresponds to the `SCNCameraController.interactionMode::OrbitArcball` case.
     OrbitArcball = 4,
+    /// Corresponds to the `SCNCameraController.interactionMode::Pan` case.
     Pan = 5,
+    /// Corresponds to the `SCNCameraController.interactionMode::Truck` case.
     Truck = 6,
 }
 
@@ -41,6 +49,7 @@ impl InteractionMode {
 
 type CameraControllerCallback = Box<dyn FnMut()>;
 
+/// Stores Rust callbacks backing `SCNCameraControllerDelegate`.
 #[derive(Default)]
 pub struct CameraControllerDelegateCallbacks {
     inertia_will_start: Option<CameraControllerCallback>,
@@ -48,6 +57,7 @@ pub struct CameraControllerDelegateCallbacks {
 }
 
 impl CameraControllerDelegateCallbacks {
+    /// Creates a wrapped `SCNCameraControllerDelegateCallbacks` instance.
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -56,6 +66,7 @@ impl CameraControllerDelegateCallbacks {
         }
     }
 
+    /// Mirrors `SCNCameraControllerDelegateCallbacks.onInertiaWillStart`.
     #[must_use]
     pub fn on_inertia_will_start<F>(mut self, callback: F) -> Self
     where
@@ -65,6 +76,7 @@ impl CameraControllerDelegateCallbacks {
         self
     }
 
+    /// Mirrors `SCNCameraControllerDelegateCallbacks.onInertiaDidEnd`.
     #[must_use]
     pub fn on_inertia_did_end<F>(mut self, callback: F) -> Self
     where
@@ -79,6 +91,7 @@ struct CameraControllerDelegateState {
     callbacks: CameraControllerDelegateCallbacks,
 }
 
+/// Wraps `SCNCameraControllerDelegate`.
 pub struct CameraControllerDelegate {
     ptr: *mut c_void,
 }
@@ -142,6 +155,7 @@ extern "C" fn camera_controller_inertia_did_end_trampoline(context: *mut c_void)
 }
 
 impl CameraControllerDelegate {
+    /// Creates a wrapped `SCNCameraControllerDelegate` instance.
     #[must_use]
     pub fn new(callbacks: CameraControllerDelegateCallbacks) -> Option<Self> {
         let state = Box::new(CameraControllerDelegateState { callbacks });
@@ -162,6 +176,7 @@ impl CameraControllerDelegate {
         }
     }
 
+    /// Returns the Objective-C pointer backing this `SCNCameraControllerDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
         self.ptr
@@ -169,11 +184,13 @@ impl CameraControllerDelegate {
 }
 
 impl CameraControlConfiguration {
+    /// Mirrors `SCNCameraControlConfiguration.autoSwitchToFreeCamera`.
     #[must_use]
     pub fn auto_switch_to_free_camera(&self) -> bool {
         unsafe { ffi::scn_camera_control_configuration_get_auto_switch_to_free_camera(self.ptr) }
     }
 
+    /// Sets the `SCNCameraControlConfiguration.autoSwitchToFreeCamera` member.
     pub fn set_auto_switch_to_free_camera(&self, auto_switch_to_free_camera: bool) {
         unsafe {
             ffi::scn_camera_control_configuration_set_auto_switch_to_free_camera(
@@ -183,11 +200,13 @@ impl CameraControlConfiguration {
         };
     }
 
+    /// Mirrors `SCNCameraControlConfiguration.allowsTranslation`.
     #[must_use]
     pub fn allows_translation(&self) -> bool {
         unsafe { ffi::scn_camera_control_configuration_get_allows_translation(self.ptr) }
     }
 
+    /// Sets the `SCNCameraControlConfiguration.allowsTranslation` member.
     pub fn set_allows_translation(&self, allows_translation: bool) {
         unsafe {
             ffi::scn_camera_control_configuration_set_allows_translation(
@@ -197,11 +216,13 @@ impl CameraControlConfiguration {
         };
     }
 
+    /// Mirrors `SCNCameraControlConfiguration.flyModeVelocity`.
     #[must_use]
     pub fn fly_mode_velocity(&self) -> f64 {
         unsafe { ffi::scn_camera_control_configuration_get_fly_mode_velocity(self.ptr) }
     }
 
+    /// Sets the `SCNCameraControlConfiguration.flyModeVelocity` member.
     pub fn set_fly_mode_velocity(&self, fly_mode_velocity: f64) {
         unsafe {
             ffi::scn_camera_control_configuration_set_fly_mode_velocity(
@@ -211,22 +232,26 @@ impl CameraControlConfiguration {
         };
     }
 
+    /// Mirrors `SCNCameraControlConfiguration.panSensitivity`.
     #[must_use]
     pub fn pan_sensitivity(&self) -> f64 {
         unsafe { ffi::scn_camera_control_configuration_get_pan_sensitivity(self.ptr) }
     }
 
+    /// Sets the `SCNCameraControlConfiguration.panSensitivity` member.
     pub fn set_pan_sensitivity(&self, pan_sensitivity: f64) {
         unsafe {
             ffi::scn_camera_control_configuration_set_pan_sensitivity(self.ptr, pan_sensitivity);
         };
     }
 
+    /// Mirrors `SCNCameraControlConfiguration.truckSensitivity`.
     #[must_use]
     pub fn truck_sensitivity(&self) -> f64 {
         unsafe { ffi::scn_camera_control_configuration_get_truck_sensitivity(self.ptr) }
     }
 
+    /// Sets the `SCNCameraControlConfiguration.truckSensitivity` member.
     pub fn set_truck_sensitivity(&self, truck_sensitivity: f64) {
         unsafe {
             ffi::scn_camera_control_configuration_set_truck_sensitivity(
@@ -236,11 +261,13 @@ impl CameraControlConfiguration {
         };
     }
 
+    /// Mirrors `SCNCameraControlConfiguration.rotationSensitivity`.
     #[must_use]
     pub fn rotation_sensitivity(&self) -> f64 {
         unsafe { ffi::scn_camera_control_configuration_get_rotation_sensitivity(self.ptr) }
     }
 
+    /// Sets the `SCNCameraControlConfiguration.rotationSensitivity` member.
     pub fn set_rotation_sensitivity(&self, rotation_sensitivity: f64) {
         unsafe {
             ffi::scn_camera_control_configuration_set_rotation_sensitivity(
@@ -252,6 +279,7 @@ impl CameraControlConfiguration {
 }
 
 impl CameraController {
+    /// Sets the `SCNCameraController.delegate` member.
     pub fn set_delegate(&self, delegate: Option<&CameraControllerDelegate>) {
         unsafe {
             ffi::scn_camera_controller_set_delegate(
@@ -261,11 +289,13 @@ impl CameraController {
         };
     }
 
+    /// Mirrors `SCNCameraController.pointOfView`.
     #[must_use]
     pub fn point_of_view(&self) -> Option<Node> {
         unsafe { Node::from_raw(ffi::scn_camera_controller_get_point_of_view(self.ptr)) }
     }
 
+    /// Sets the `SCNCameraController.pointOfView` member.
     pub fn set_point_of_view(&self, point_of_view: Option<&Node>) {
         unsafe {
             ffi::scn_camera_controller_set_point_of_view(
@@ -275,6 +305,7 @@ impl CameraController {
         };
     }
 
+    /// Mirrors `SCNCameraController.interactionMode`.
     #[must_use]
     pub fn interaction_mode(&self) -> Option<InteractionMode> {
         InteractionMode::from_raw(unsafe {
@@ -282,12 +313,14 @@ impl CameraController {
         })
     }
 
+    /// Sets the `SCNCameraController.interactionMode` member.
     pub fn set_interaction_mode(&self, interaction_mode: InteractionMode) {
         unsafe {
             ffi::scn_camera_controller_set_interaction_mode(self.ptr, interaction_mode as i32);
         };
     }
 
+    /// Mirrors `SCNCameraController.target`.
     #[must_use]
     pub fn target(&self) -> Vector3 {
         let mut target = Vector3::default();
@@ -296,21 +329,25 @@ impl CameraController {
         target
     }
 
+    /// Sets the `SCNCameraController.target` member.
     pub fn set_target(&self, target: Vector3) {
         unsafe {
             ffi::scn_camera_controller_set_target(self.ptr, target.as_ptr().cast_mut().cast());
         };
     }
 
+    /// Mirrors `SCNCameraController.automaticTarget`.
     #[must_use]
     pub fn automatic_target(&self) -> bool {
         unsafe { ffi::scn_camera_controller_get_automatic_target(self.ptr) }
     }
 
+    /// Sets the `SCNCameraController.automaticTarget` member.
     pub fn set_automatic_target(&self, automatic_target: bool) {
         unsafe { ffi::scn_camera_controller_set_automatic_target(self.ptr, automatic_target) };
     }
 
+    /// Mirrors `SCNCameraController.worldUp`.
     #[must_use]
     pub fn world_up(&self) -> Vector3 {
         let mut world_up = Vector3::default();
@@ -320,62 +357,74 @@ impl CameraController {
         world_up
     }
 
+    /// Sets the `SCNCameraController.worldUp` member.
     pub fn set_world_up(&self, world_up: Vector3) {
         unsafe {
             ffi::scn_camera_controller_set_world_up(self.ptr, world_up.as_ptr().cast_mut().cast());
         };
     }
 
+    /// Mirrors `SCNCameraController.inertiaEnabled`.
     #[must_use]
     pub fn inertia_enabled(&self) -> bool {
         unsafe { ffi::scn_camera_controller_get_inertia_enabled(self.ptr) }
     }
 
+    /// Sets the `SCNCameraController.inertiaEnabled` member.
     pub fn set_inertia_enabled(&self, inertia_enabled: bool) {
         unsafe { ffi::scn_camera_controller_set_inertia_enabled(self.ptr, inertia_enabled) };
     }
 
+    /// Mirrors `SCNCameraController.inertiaFriction`.
     #[must_use]
     pub fn inertia_friction(&self) -> f32 {
         unsafe { ffi::scn_camera_controller_get_inertia_friction(self.ptr) }
     }
 
+    /// Sets the `SCNCameraController.inertiaFriction` member.
     pub fn set_inertia_friction(&self, inertia_friction: f32) {
         unsafe { ffi::scn_camera_controller_set_inertia_friction(self.ptr, inertia_friction) };
     }
 
+    /// Returns the `SCNCameraController.isInertiaRunning` value.
     #[must_use]
     pub fn is_inertia_running(&self) -> bool {
         unsafe { ffi::scn_camera_controller_get_inertia_running(self.ptr) }
     }
 
+    /// Mirrors `SCNCameraController.minimumVerticalAngle`.
     #[must_use]
     pub fn minimum_vertical_angle(&self) -> f32 {
         unsafe { ffi::scn_camera_controller_get_minimum_vertical_angle(self.ptr) }
     }
 
+    /// Sets the `SCNCameraController.minimumVerticalAngle` member.
     pub fn set_minimum_vertical_angle(&self, minimum_vertical_angle: f32) {
         unsafe {
             ffi::scn_camera_controller_set_minimum_vertical_angle(self.ptr, minimum_vertical_angle);
         };
     }
 
+    /// Mirrors `SCNCameraController.maximumVerticalAngle`.
     #[must_use]
     pub fn maximum_vertical_angle(&self) -> f32 {
         unsafe { ffi::scn_camera_controller_get_maximum_vertical_angle(self.ptr) }
     }
 
+    /// Sets the `SCNCameraController.maximumVerticalAngle` member.
     pub fn set_maximum_vertical_angle(&self, maximum_vertical_angle: f32) {
         unsafe {
             ffi::scn_camera_controller_set_maximum_vertical_angle(self.ptr, maximum_vertical_angle);
         };
     }
 
+    /// Mirrors `SCNCameraController.minimumHorizontalAngle`.
     #[must_use]
     pub fn minimum_horizontal_angle(&self) -> f32 {
         unsafe { ffi::scn_camera_controller_get_minimum_horizontal_angle(self.ptr) }
     }
 
+    /// Sets the `SCNCameraController.minimumHorizontalAngle` member.
     pub fn set_minimum_horizontal_angle(&self, minimum_horizontal_angle: f32) {
         unsafe {
             ffi::scn_camera_controller_set_minimum_horizontal_angle(
@@ -385,11 +434,13 @@ impl CameraController {
         };
     }
 
+    /// Mirrors `SCNCameraController.maximumHorizontalAngle`.
     #[must_use]
     pub fn maximum_horizontal_angle(&self) -> f32 {
         unsafe { ffi::scn_camera_controller_get_maximum_horizontal_angle(self.ptr) }
     }
 
+    /// Sets the `SCNCameraController.maximumHorizontalAngle` member.
     pub fn set_maximum_horizontal_angle(&self, maximum_horizontal_angle: f32) {
         unsafe {
             ffi::scn_camera_controller_set_maximum_horizontal_angle(
@@ -399,6 +450,7 @@ impl CameraController {
         };
     }
 
+    /// Mirrors `SCNCameraController.translateInCameraSpace`.
     pub fn translate_in_camera_space(&self, delta: Vector3) {
         unsafe {
             ffi::scn_camera_controller_translate_in_camera_space(
@@ -407,6 +459,7 @@ impl CameraController {
         };
     }
 
+    /// Mirrors `SCNCameraController.frameNodes`.
     pub fn frame_nodes(&self, nodes: &[Node]) {
         let raw_nodes = nodes.iter().map(Node::as_ptr).collect::<Vec<_>>();
         unsafe {
@@ -418,10 +471,12 @@ impl CameraController {
         };
     }
 
+    /// Mirrors `SCNCameraController.rotateBy`.
     pub fn rotate_by(&self, delta_x: f32, delta_y: f32) {
         unsafe { ffi::scn_camera_controller_rotate_by(self.ptr, delta_x, delta_y) };
     }
 
+    /// Mirrors `SCNCameraController.rollBy`.
     pub fn roll_by(&self, delta: f32, around_screen_point: CGPoint, viewport: CGSize) {
         unsafe {
             ffi::scn_camera_controller_roll_by(
@@ -435,6 +490,7 @@ impl CameraController {
         };
     }
 
+    /// Mirrors `SCNCameraController.dollyBy`.
     pub fn dolly_by(&self, delta: f32, on_screen_point: CGPoint, viewport: CGSize) {
         unsafe {
             ffi::scn_camera_controller_dolly_by(
@@ -448,22 +504,27 @@ impl CameraController {
         };
     }
 
+    /// Mirrors `SCNCameraController.rollAroundTarget`.
     pub fn roll_around_target(&self, delta: f32) {
         unsafe { ffi::scn_camera_controller_roll_around_target(self.ptr, delta) };
     }
 
+    /// Mirrors `SCNCameraController.dollyToTarget`.
     pub fn dolly_to_target(&self, delta: f32) {
         unsafe { ffi::scn_camera_controller_dolly_to_target(self.ptr, delta) };
     }
 
+    /// Mirrors `SCNCameraController.clearRoll`.
     pub fn clear_roll(&self) {
         unsafe { ffi::scn_camera_controller_clear_roll(self.ptr) };
     }
 
+    /// Mirrors `SCNCameraController.stopInertia`.
     pub fn stop_inertia(&self) {
         unsafe { ffi::scn_camera_controller_stop_inertia(self.ptr) };
     }
 
+    /// Mirrors `SCNCameraController.beginInteraction`.
     pub fn begin_interaction(&self, location: CGPoint, viewport: CGSize) {
         unsafe {
             ffi::scn_camera_controller_begin_interaction(
@@ -476,6 +537,7 @@ impl CameraController {
         };
     }
 
+    /// Mirrors `SCNCameraController.continueInteraction`.
     pub fn continue_interaction(&self, location: CGPoint, viewport: CGSize, sensitivity: f64) {
         unsafe {
             ffi::scn_camera_controller_continue_interaction(
@@ -489,6 +551,7 @@ impl CameraController {
         };
     }
 
+    /// Mirrors `SCNCameraController.endInteraction`.
     pub fn end_interaction(&self, location: CGPoint, viewport: CGSize, velocity: CGPoint) {
         unsafe {
             ffi::scn_camera_controller_end_interaction(
@@ -505,6 +568,7 @@ impl CameraController {
 }
 
 impl View {
+    /// Mirrors `SCNView.cameraControlConfiguration`.
     #[must_use]
     pub fn camera_control_configuration(&self) -> Option<CameraControlConfiguration> {
         unsafe {
@@ -514,6 +578,7 @@ impl View {
         }
     }
 
+    /// Mirrors `SCNView.defaultCameraController`.
     #[must_use]
     pub fn default_camera_controller(&self) -> Option<CameraController> {
         unsafe { CameraController::from_raw(ffi::scn_view_default_camera_controller(self.ptr)) }
