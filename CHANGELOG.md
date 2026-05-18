@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.5] - 2026-05-18
+
+- Widen apple-metal version bound so the 0.x bump dep resolves. No source changes.
+
 ## [0.2.4] - 2026-05-18
 
 - Widen apple-cf version bound to `<0.9` so the 0.8.0 nested-CGRect dep resolves. No source changes.
