@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.8] - 2026-05-20
+
+- Migrated local `take_string` body to call `doom_fish_utils::ffi_string::take_owned_cstring_c`. Centralises the duplicated FFI take-string pattern fleet-wide. No public API change.
+
 ## [0.2.7] - 2026-05-18
 
 - Added one-line rustdoc coverage across the public SceneKit wrapper surface, lifting the crate from an undocumented API surface to a fully documented one for rustc `missing_docs` checks.

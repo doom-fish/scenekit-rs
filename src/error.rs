@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::ffi::CStr;
 use std::fmt;
 
 /// Represents an error surfaced by a SceneKit wrapper call.
@@ -27,12 +26,7 @@ impl fmt::Display for SceneKitError {
 impl Error for SceneKitError {}
 
 pub(crate) unsafe fn take_string(ptr: *mut libc::c_char) -> Option<String> {
-    if ptr.is_null() {
-        return None;
-    }
-    let value = CStr::from_ptr(ptr).to_string_lossy().into_owned();
-    libc::free(ptr.cast());
-    Some(value)
+    doom_fish_utils::ffi_string::take_owned_cstring_c(ptr, |p| libc::free(p.cast()))
 }
 
 pub(crate) unsafe fn take_error(ptr: *mut libc::c_char, fallback: &str) -> SceneKitError {
