@@ -104,14 +104,11 @@ impl core::fmt::Debug for CameraControllerDelegate {
     }
 }
 
-impl Drop for CameraControllerDelegate {
-    fn drop(&mut self) {
-        if !self.ptr.is_null() {
-            unsafe { ffi::scn_release(self.ptr) };
-            self.ptr = ptr::null_mut();
-        }
-    }
-}
+crate::private::scn_retained!(
+    CameraControllerDelegate,
+    field = ptr,
+    release = ffi::scn_release
+);
 
 unsafe fn delegate_state_from_context<'a>(
     context: *mut c_void,

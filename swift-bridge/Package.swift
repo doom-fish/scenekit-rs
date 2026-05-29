@@ -15,7 +15,6 @@ let package = Package(
     targets: [
         .target(
             name: "SceneKitBridge",
-            path: "Sources/SceneKitBridge",
-            publicHeadersPath: "include")
+            path: "Sources/SceneKitBridge")
     ]
 )

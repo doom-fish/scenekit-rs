@@ -116,3 +116,26 @@ impl Default for Matrix4 {
         Self::identity()
     }
 }
+
+// MARK: - ABI Layout Assertions
+//
+// `Vector3`, `Vector4` and `Matrix4` are `#[repr(C)]` and are marshalled across
+// the Rust <-> Swift `@_cdecl` FFI boundary as contiguous `f32` buffers (the
+// Swift bridge in `swift-bridge/Sources/SceneKitBridge/Core.swift` reads/writes
+// them via `assumingMemoryBound(to: Float.self)`). These compile-time
+// assertions pin the exact size and alignment shared with Swift so any
+// accidental field reordering / type change fails the build immediately instead
+// of silently corrupting marshalled data at runtime. The cross-language
+// `scn_verify_ffi_layout` check in `tests/ffi_layout_tests.rs` guards the Swift
+// side's `f32` element size too. (`offset_of!` is intentionally not used: the
+// crate MSRV is 1.76, below the 1.77 that stabilized it.)
+use core::mem::{align_of, size_of};
+
+const _: () = assert!(size_of::<Vector3>() == 12);
+const _: () = assert!(align_of::<Vector3>() == 4);
+
+const _: () = assert!(size_of::<Vector4>() == 16);
+const _: () = assert!(align_of::<Vector4>() == 4);
+
+const _: () = assert!(size_of::<Matrix4>() == 64);
+const _: () = assert!(align_of::<Matrix4>() == 4);

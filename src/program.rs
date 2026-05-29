@@ -101,23 +101,13 @@ impl core::fmt::Debug for ProgramBufferBinding {
     }
 }
 
-impl Drop for ProgramDelegate {
-    fn drop(&mut self) {
-        if !self.ptr.is_null() {
-            unsafe { ffi::scn_release(self.ptr) };
-            self.ptr = ptr::null_mut();
-        }
-    }
-}
+crate::private::scn_retained!(ProgramDelegate, field = ptr, release = ffi::scn_release);
 
-impl Drop for ProgramBufferBinding {
-    fn drop(&mut self) {
-        if !self.ptr.is_null() {
-            unsafe { ffi::scn_release(self.ptr) };
-            self.ptr = ptr::null_mut();
-        }
-    }
-}
+crate::private::scn_retained!(
+    ProgramBufferBinding,
+    field = ptr,
+    release = ffi::scn_release
+);
 
 unsafe fn program_delegate_state_from_context<'a>(
     context: *mut c_void,

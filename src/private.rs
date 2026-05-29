@@ -84,6 +84,35 @@ macro_rules! handle_type {
 
 pub(crate) use handle_type;
 
+/// Generate a `Drop` impl for a release-only pointer wrapper.
+///
+/// Many delegate wrappers hold a single `*mut c_void` pointer to a retained
+/// Swift object and hand-roll an identical `Drop` that null-checks the pointer,
+/// calls `scn_release`, and clears the field. `scn_retained!` consolidates that
+/// boilerplate into a single audited place while preserving the exact behavior
+/// of the previous hand-written versions:
+/// - `Drop` null-checks `self.<field>` before calling the supplied `release`
+///   FFI fn (matching the original `if !ptr.is_null()` guards), then resets the
+///   field to a null pointer.
+///
+/// Wrappers whose `Drop` carries extra logic beyond release + null-check are
+/// intentionally left hand-written.
+macro_rules! scn_retained {
+    // Named-field struct (`{ ptr, .. }`), Drop only.
+    ($ty:ty, field = $field:ident, release = $release:path $(,)?) => {
+        impl Drop for $ty {
+            fn drop(&mut self) {
+                if !self.$field.is_null() {
+                    unsafe { $release(self.$field) };
+                    self.$field = core::ptr::null_mut();
+                }
+            }
+        }
+    };
+}
+
+pub(crate) use scn_retained;
+
 /// Builds a `CString` for SceneKit bridge calls.
 pub fn cstring_from_str(value: &str) -> Option<CString> {
     CString::new(value).ok()

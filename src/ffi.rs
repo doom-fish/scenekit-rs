@@ -15,6 +15,14 @@ extern "C" {
     pub fn scn_release(handle: *mut c_void);
     pub fn scn_constant_lookup(name: *const c_char) -> *mut c_char;
 
+    /// Cross-language ABI check implemented in the Swift bridge.
+    ///
+    /// Returns `true` only if the Swift `MemoryLayout` for the `f32` element
+    /// used to marshal `Vector3`/`Vector4`/`Matrix4`/`Color` buffers matches
+    /// the size and alignment pinned on the Rust side. Verified by
+    /// `tests/ffi_layout_tests.rs`.
+    pub fn scn_verify_ffi_layout() -> bool;
+
     pub fn scn_scene_new() -> *mut c_void;
     pub fn scn_scene_new_named(name: *const c_char) -> *mut c_void;
     pub fn scn_scene_new_url(path: *const c_char, out_error: *mut *mut c_char) -> *mut c_void;

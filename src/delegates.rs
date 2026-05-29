@@ -103,14 +103,11 @@ impl core::fmt::Debug for NodeRendererDelegate {
     }
 }
 
-impl Drop for NodeRendererDelegate {
-    fn drop(&mut self) {
-        if !self.ptr.is_null() {
-            unsafe { crate::ffi::scn_release(self.ptr) };
-            self.ptr = ptr::null_mut();
-        }
-    }
-}
+crate::private::scn_retained!(
+    NodeRendererDelegate,
+    field = ptr,
+    release = crate::ffi::scn_release
+);
 
 unsafe fn node_renderer_state_from_context<'a>(
     context: *mut c_void,
@@ -228,14 +225,11 @@ impl core::fmt::Debug for AvoidOccluderConstraintDelegate {
     }
 }
 
-impl Drop for AvoidOccluderConstraintDelegate {
-    fn drop(&mut self) {
-        if !self.ptr.is_null() {
-            unsafe { crate::ffi::scn_release(self.ptr) };
-            self.ptr = ptr::null_mut();
-        }
-    }
-}
+crate::private::scn_retained!(
+    AvoidOccluderConstraintDelegate,
+    field = ptr,
+    release = crate::ffi::scn_release
+);
 
 unsafe fn avoid_occluder_state_from_context<'a>(
     context: *mut c_void,
@@ -342,14 +336,11 @@ impl core::fmt::Debug for SceneExportDelegate {
     }
 }
 
-impl Drop for SceneExportDelegate {
-    fn drop(&mut self) {
-        if !self.ptr.is_null() {
-            unsafe { crate::ffi::scn_release(self.ptr) };
-            self.ptr = ptr::null_mut();
-        }
-    }
-}
+crate::private::scn_retained!(
+    SceneExportDelegate,
+    field = ptr,
+    release = crate::ffi::scn_release
+);
 
 unsafe fn scene_export_state_from_context<'a>(
     context: *mut c_void,

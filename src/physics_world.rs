@@ -107,14 +107,11 @@ impl core::fmt::Debug for PhysicsContactDelegate {
     }
 }
 
-impl Drop for PhysicsContactDelegate {
-    fn drop(&mut self) {
-        if !self.ptr.is_null() {
-            unsafe { ffi::scn_release(self.ptr) };
-            self.ptr = ptr::null_mut();
-        }
-    }
-}
+crate::private::scn_retained!(
+    PhysicsContactDelegate,
+    field = ptr,
+    release = ffi::scn_release
+);
 
 unsafe fn physics_delegate_state_from_context<'a>(
     context: *mut c_void,

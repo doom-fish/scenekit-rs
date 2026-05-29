@@ -149,3 +149,16 @@ func scnStoreAction(_ rawValue: Int32) -> MTLStoreAction {
 public func scn_release(_ handle: UnsafeMutableRawPointer?) {
     scnReleaseHandle(handle)
 }
+
+/// Cross-language ABI check consumed by `tests/ffi_layout_tests.rs`.
+///
+/// `Vector3`/`Vector4`/`Matrix4`/`Color` are marshalled across the FFI
+/// boundary as contiguous `Float` buffers. Returns `true` only if Swift's
+/// `Float` size, stride and alignment match the 4-byte `f32` layout pinned on
+/// the Rust side; a `false` return signals a genuine ABI mismatch.
+@_cdecl("scn_verify_ffi_layout")
+public func scn_verify_ffi_layout() -> Bool {
+    return MemoryLayout<Float>.size == 4
+        && MemoryLayout<Float>.stride == 4
+        && MemoryLayout<Float>.alignment == 4
+}
