@@ -30,16 +30,37 @@ public func scn_geometry_new_shape(_ extrusionDepth: Double) -> UnsafeMutableRaw
 
 @_cdecl("scn_geometry_source_new_vertices")
 public func scn_geometry_source_new_vertices(_ vertices: UnsafeRawPointer?, _ count: Int) -> UnsafeMutableRawPointer? {
-    guard let vertices else { return nil }
-    let typed = vertices.bindMemory(to: SCNVector3.self, capacity: count)
-    return scnRetain(SCNGeometrySource(__vertices: typed, count: count))
+    guard let vertices, count > 0 else { return nil }
+    // The Rust side marshals `Vector3` as three 32-bit `Float`s (12 bytes),
+    // whereas `SCNVector3` on macOS is three `CGFloat`s (24 bytes). Binding the
+    // buffer directly to `SCNVector3` would read 24 bytes per element from a
+    // 12-byte-per-element allocation (out-of-bounds read + garbage values), so
+    // read `Float` triples and convert, matching `scnReadVector3` in Core.swift.
+    let floats = vertices.assumingMemoryBound(to: Float.self)
+    let typed = (0..<count).map { index in
+        SCNVector3(
+            x: CGFloat(floats[index * 3]),
+            y: CGFloat(floats[index * 3 + 1]),
+            z: CGFloat(floats[index * 3 + 2])
+        )
+    }
+    return scnRetain(SCNGeometrySource(vertices: typed))
 }
 
 @_cdecl("scn_geometry_source_new_normals")
 public func scn_geometry_source_new_normals(_ normals: UnsafeRawPointer?, _ count: Int) -> UnsafeMutableRawPointer? {
-    guard let normals else { return nil }
-    let typed = normals.bindMemory(to: SCNVector3.self, capacity: count)
-    return scnRetain(SCNGeometrySource(__normals: typed, count: count))
+    guard let normals, count > 0 else { return nil }
+    // See `scn_geometry_source_new_vertices`: the Rust `Vector3` buffer is
+    // `Float`-packed, so convert rather than binding to the wider `SCNVector3`.
+    let floats = normals.assumingMemoryBound(to: Float.self)
+    let typed = (0..<count).map { index in
+        SCNVector3(
+            x: CGFloat(floats[index * 3]),
+            y: CGFloat(floats[index * 3 + 1]),
+            z: CGFloat(floats[index * 3 + 2])
+        )
+    }
+    return scnRetain(SCNGeometrySource(normals: typed))
 }
 
 @_cdecl("scn_geometry_source_new_texcoords")
