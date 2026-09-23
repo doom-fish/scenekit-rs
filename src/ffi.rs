@@ -174,7 +174,9 @@ extern "C" {
     pub fn scn_texture_copy_bytes(
         texture: *mut c_void,
         out_bytes: *mut c_void,
+        length: usize,
         bytes_per_row: usize,
+        bytes_per_pixel: usize,
     ) -> bool;
 
     pub fn scn_animation_new_opacity(from: f32, to: f32, duration: f64) -> *mut c_void;

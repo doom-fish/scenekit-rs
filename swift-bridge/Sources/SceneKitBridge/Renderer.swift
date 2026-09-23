@@ -81,9 +81,21 @@ public func scn_renderer_render(
 public func scn_texture_copy_bytes(
     _ textureHandle: UnsafeMutableRawPointer?,
     _ outBytes: UnsafeMutableRawPointer?,
-    _ bytesPerRow: Int
+    _ length: Int,
+    _ bytesPerRow: Int,
+    _ bytesPerPixel: Int
 ) -> Bool {
-    guard let texture: MTLTexture = scnBorrow(textureHandle), let outBytes else { return false }
+    guard let texture: MTLTexture = scnBorrow(textureHandle),
+          let outBytes,
+          bytesPerPixel > 0,
+          texture.textureType == .type2D,
+          !texture.isFramebufferOnly,
+          texture.storageMode == .shared || texture.storageMode == .managed
+    else { return false }
+    let (minimumRow, rowOverflow) = texture.width.multipliedReportingOverflow(by: bytesPerPixel)
+    guard !rowOverflow, bytesPerRow >= minimumRow else { return false }
+    let (required, overflow) = bytesPerRow.multipliedReportingOverflow(by: texture.height)
+    guard !overflow, length >= required else { return false }
     let region = MTLRegionMake2D(0, 0, texture.width, texture.height)
     texture.getBytes(outBytes, bytesPerRow: bytesPerRow, from: region, mipmapLevel: 0)
     return true

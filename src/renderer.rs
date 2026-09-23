@@ -1,5 +1,5 @@
 use apple_cf::cg::CGRect;
-use apple_metal::{CommandBuffer, MetalDevice, MetalTexture};
+use apple_metal::{storage_mode, texture_type, CommandBuffer, MetalDevice, MetalTexture};
 
 use crate::color::Color;
 use crate::error::SceneKitError;
@@ -118,25 +118,64 @@ impl Renderer {
     }
 }
 
-/// Reads RGBA bytes back from a texture filled by `SCNRenderer`.
+/// Reads mipmap level 0 of a 2D texture filled by `SCNRenderer`, sized by its pixel format.
+///
+/// Compressed, depth, stencil and framebuffer-only textures, and textures without
+/// shared or managed storage, are rejected.
 pub fn read_texture_bytes(texture: &MetalTexture) -> Result<Vec<u8>, SceneKitError> {
+    use apple_metal::pixel_format::{
+        DEPTH16UNORM, DEPTH32FLOAT, STENCIL8, X24_STENCIL8, X32_STENCIL8,
+    };
+
+    let format = texture.pixel_format();
+    if matches!(
+        format,
+        DEPTH16UNORM | DEPTH32FLOAT | STENCIL8 | X24_STENCIL8 | X32_STENCIL8
+    ) {
+        return Err(SceneKitError::new(format!(
+            "pixel format {format} is a depth or stencil format"
+        )));
+    }
+    let bytes_per_pixel = apple_metal::bytes_per_pixel(format).ok_or_else(|| {
+        SceneKitError::new(format!(
+            "pixel format {format} is compressed or has no per-pixel layout"
+        ))
+    })?;
+    let mode = texture.storage_mode();
+    if !matches!(mode, storage_mode::SHARED | storage_mode::MANAGED) {
+        return Err(SceneKitError::new(format!(
+            "texture storage mode {mode} is not readable by the CPU"
+        )));
+    }
+    if texture.texture_type() != texture_type::TYPE_2D {
+        return Err(SceneKitError::new(format!(
+            "texture type {} is not a 2D texture",
+            texture.texture_type()
+        )));
+    }
     let width = texture.width();
     let height = texture.height();
     let bytes_per_row = width
-        .checked_mul(4)
+        .checked_mul(bytes_per_pixel)
         .ok_or_else(|| SceneKitError::new("texture row byte count overflowed usize"))?;
     let byte_len = bytes_per_row
         .checked_mul(height)
         .ok_or_else(|| SceneKitError::new("texture byte count overflowed usize"))?;
     let mut bytes = vec![0_u8; byte_len];
-    let ok = unsafe {
-        ffi::scn_texture_copy_bytes(texture.as_ptr(), bytes.as_mut_ptr().cast(), bytes_per_row)
+    let copied = unsafe {
+        ffi::scn_texture_copy_bytes(
+            texture.as_ptr(),
+            bytes.as_mut_ptr().cast(),
+            bytes.len(),
+            bytes_per_row,
+            bytes_per_pixel,
+        )
     };
-    if ok {
+    if copied {
         Ok(bytes)
     } else {
         Err(SceneKitError::new(
-            "failed to copy texture bytes from MTLTexture",
+            "MTLTexture refused the CPU copy (framebuffer-only, wrong layout or storage)",
         ))
     }
 }
