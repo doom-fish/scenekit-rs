@@ -94,8 +94,9 @@ pub use extended_constraints::{
     ReplicatorConstraint, SliderConstraint, TransformConstraint,
 };
 pub use extended_geometry::{
-    Capsule, GeometryElement, GeometrySource, GeometryTessellator, LevelOfDetail, Morpher,
-    ParticlePropertyController, Pyramid, ReferenceNode, Shape, Skinner, Torus, Tube,
+    Capsule, GeometryElement, GeometrySource, GeometrySourceLayout, GeometrySourceSemantic,
+    GeometryTessellator, LevelOfDetail, Morpher, ParticlePropertyController, Pyramid,
+    ReferenceNode, Shape, Skinner, Torus, Tube,
 };
 pub use extended_physics::{
     PhysicsBallSocketJoint, PhysicsBehavior, PhysicsConeTwistJoint, PhysicsField,
@@ -147,9 +148,10 @@ pub mod prelude {
         AvoidOccluderConstraintDelegateCallbacks, BillboardConstraint, BufferFrequency,
         BufferStream, Camera, CameraControlConfiguration, CameraController,
         CameraControllerDelegate, CameraControllerDelegateCallbacks, Capsule, Color, Constraint,
-        DebugOptions, Geometry, GeometryElement, GeometrySource, GeometryTessellator,
-        HitTestResult, HitTestResults, IKConstraint, InteractionMode, LevelOfDetail, Light,
-        LightType, LoadAction, Material, MaterialProperty, Matrix4, Morpher, Node,
+        DebugOptions, Geometry, GeometryElement, GeometrySource, GeometrySourceLayout,
+        GeometrySourceSemantic, GeometryTessellator, HitTestResult, HitTestResults,
+        IKConstraint, InteractionMode, LevelOfDetail, Light, LightType, LoadAction, Material,
+        MaterialProperty, Matrix4, Morpher, Node,
         NodeRendererDelegate, NodeRendererDelegateCallbacks, ParticlePropertyController,
         ParticleSystem, PhysicsBallSocketJoint, PhysicsBehavior, PhysicsBody, PhysicsBodyType,
         PhysicsConeTwistJoint, PhysicsContact, PhysicsContactDelegate,
