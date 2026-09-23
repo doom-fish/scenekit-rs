@@ -1,10 +1,11 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use scenekit::{
-    ffi, physics_world, PhysicsBody, PhysicsContactDelegate, PhysicsContactDelegateCallbacks,
-    Scene, Vector3,
+    physics_world, PhysicsBody, PhysicsContactDelegate, PhysicsContactDelegateCallbacks, Scene,
+    Vector3,
 };
+
+mod common;
 
 #[test]
 fn test_physics_world_properties_and_delegate_round_trip() {
@@ -26,33 +27,37 @@ fn test_physics_world_properties_and_delegate_round_trip() {
     assert_eq!(world.contact_test_between_bodies(&body_a, &body_b), 0);
     world.update_collision_pairs();
 
-    let delegate_events = Rc::new(RefCell::new(Vec::new()));
+    let delegate_events = Arc::new(Mutex::new(Vec::new()));
     let delegate = PhysicsContactDelegate::new(
         PhysicsContactDelegateCallbacks::new()
             .on_did_begin_contact({
-                let delegate_events = Rc::clone(&delegate_events);
-                move |_| delegate_events.borrow_mut().push("did-begin")
+                let delegate_events = Arc::clone(&delegate_events);
+                move |_| delegate_events.lock().expect("events").push("did-begin")
             })
             .on_did_update_contact({
-                let delegate_events = Rc::clone(&delegate_events);
-                move |_| delegate_events.borrow_mut().push("did-update")
+                let delegate_events = Arc::clone(&delegate_events);
+                move |_| delegate_events.lock().expect("events").push("did-update")
             })
             .on_did_end_contact({
-                let delegate_events = Rc::clone(&delegate_events);
-                move |_| delegate_events.borrow_mut().push("did-end")
+                let delegate_events = Arc::clone(&delegate_events);
+                move |_| delegate_events.lock().expect("events").push("did-end")
             }),
     )
     .expect("physics contact delegate");
     world.set_contact_delegate(Some(&delegate));
 
-    unsafe {
-        ffi::scn_physics_world_test_invoke_delegate_did_begin(world.as_ptr());
-        ffi::scn_physics_world_test_invoke_delegate_did_update(world.as_ptr());
-        ffi::scn_physics_world_test_invoke_delegate_did_end(world.as_ptr());
-    }
+    let invoke = || unsafe {
+        common::scn_physics_world_test_invoke_delegate_did_begin(world.as_ptr());
+        common::scn_physics_world_test_invoke_delegate_did_update(world.as_ptr());
+        common::scn_physics_world_test_invoke_delegate_did_end(world.as_ptr());
+    };
+    invoke();
+    assert_eq!(
+        delegate_events.lock().expect("events").as_slice(),
+        ["did-begin", "did-update", "did-end"]
+    );
 
-    let delegate_events = delegate_events.borrow();
-    assert!(delegate_events.contains(&"did-begin"));
-    assert!(delegate_events.contains(&"did-update"));
-    assert!(delegate_events.contains(&"did-end"));
+    drop(delegate);
+    common::autoreleasepool(invoke);
+    assert_eq!(delegate_events.lock().expect("events").len(), 3);
 }

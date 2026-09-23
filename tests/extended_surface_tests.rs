@@ -1,7 +1,7 @@
-use std::cell::RefCell;
 use std::fs;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use apple_metal::MetalDevice;
 use scenekit::{
@@ -9,8 +9,7 @@ use scenekit::{
     AvoidOccluderConstraintDelegateCallbacks, Geometry, Node, NodeRendererDelegate,
     NodeRendererDelegateCallbacks, PhysicsBallSocketJoint, PhysicsBody, PhysicsField,
     PhysicsFieldScope, PhysicsHingeJoint, PhysicsShape, PhysicsSliderJoint, PhysicsVehicle,
-    PhysicsVehicleWheel, Prepareable, Renderer, Scene, SceneExportDelegate, SceneRenderer,
-    SpriteScene, SpriteTransition, Vector3, View,
+    PhysicsVehicleWheel, Renderer, Scene, SceneExportDelegate, SceneRenderer, Vector3,
 };
 
 mod common;
@@ -21,64 +20,6 @@ fn scene_with_cube() -> (Scene, Node, Node, Geometry, Node) {
     let cube_node = Node::with_geometry(Some(&cube)).expect("cube node");
     root.add_child_node(&cube_node);
     (scene, root, camera_node, cube, cube_node)
-}
-
-#[test]
-fn test_extended_scene_renderer_surface() {
-    let (scene, _root, camera_node, cube, cube_node) = scene_with_cube();
-    let view = View::new(80.0, 60.0).expect("view");
-    SceneRenderer::set_scene(&view, Some(&scene));
-    SceneRenderer::set_point_of_view(&view, Some(&camera_node));
-
-    let material = cube.first_material().expect("material");
-    assert!(SceneRenderer::prepare_object(&view, &scene));
-    assert!(SceneRenderer::prepare_object(&view, &cube));
-    assert!(SceneRenderer::prepare_object(&view, &material));
-    assert!(SceneRenderer::prepare_objects(
-        &view,
-        &[
-            &scene as &dyn Prepareable,
-            &cube_node as &dyn Prepareable,
-            &cube as &dyn Prepareable,
-            &material as &dyn Prepareable,
-        ],
-    ));
-
-    let projected =
-        SceneRenderer::project_point(&view, Vector3::new(0.0, 0.0, 0.0)).expect("project");
-    let unprojected = SceneRenderer::unproject_point(&view, projected).expect("unproject");
-    assert!(unprojected.z.is_finite());
-
-    let hits = SceneRenderer::hit_test(
-        &view,
-        scenekit::CGPoint::new(projected.x.into(), projected.y.into()),
-    )
-    .expect("hit test");
-    let _ = hits.count();
-    assert!(SceneRenderer::is_node_inside_frustum(
-        &view,
-        &cube_node,
-        &camera_node
-    ));
-    assert!(!SceneRenderer::nodes_inside_frustum(&view, &camera_node).is_empty());
-
-    SceneRenderer::set_current_time(&view, 0.75);
-    let _ = SceneRenderer::current_time(&view);
-
-    SceneRenderer::set_audio_listener(&view, Some(&camera_node));
-    let _ = SceneRenderer::audio_listener(&view);
-    let _ = SceneRenderer::audio_engine(&view);
-    let _ = SceneRenderer::audio_environment_node(&view);
-
-    let overlay = SpriteScene::new(32.0, 32.0).expect("overlay scene");
-    SceneRenderer::set_overlay_scene(&view, Some(&overlay));
-    assert!(SceneRenderer::overlay_scene(&view).is_some());
-    let _ = SceneRenderer::working_color_space(&view);
-
-    let replacement = Scene::new().expect("replacement scene");
-    let transition = SpriteTransition::fade(0.0).expect("transition");
-    SceneRenderer::present_scene(&view, &replacement, Some(&transition), None);
-    assert!(SceneRenderer::scene(&view).is_some());
 }
 
 #[test]
@@ -96,18 +37,20 @@ fn test_node_renderer_delegate_bridge() {
     let reverse_z = SceneRenderer::uses_reverse_z(&renderer);
     SceneRenderer::set_uses_reverse_z(&renderer, reverse_z);
     let node = Node::new().expect("node");
-    let calls = Rc::new(RefCell::new(0usize));
+    let calls = Arc::new(AtomicUsize::new(0));
 
     let delegate = NodeRendererDelegate::new(NodeRendererDelegateCallbacks::new().on_render({
-        let calls = Rc::clone(&calls);
-        move |_, _| *calls.borrow_mut() += 1
+        let calls = Arc::clone(&calls);
+        move |_, _| {
+            calls.fetch_add(1, Ordering::SeqCst);
+        }
     }))
     .expect("node renderer delegate");
 
     node.set_renderer_delegate(Some(&delegate));
     assert!(node.renderer_delegate().is_some());
-    node.test_invoke_renderer_delegate(&renderer);
-    assert_eq!(*calls.borrow(), 1);
+    unsafe { common::scn_node_test_invoke_renderer_delegate(node.as_ptr(), renderer.as_ptr()) };
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
 #[test]
@@ -116,32 +59,41 @@ fn test_avoid_occluder_delegate_bridge() {
     let occluder = Node::new().expect("occluder");
     let subject = Node::new().expect("subject");
     let constraint = AvoidOccluderConstraint::new(Some(&target)).expect("constraint");
-    let events = Rc::new(RefCell::new(Vec::new()));
+    let events = Arc::new(Mutex::new(Vec::new()));
 
     let delegate = AvoidOccluderConstraintDelegate::new(
         AvoidOccluderConstraintDelegateCallbacks::new()
             .on_should_avoid_occluder({
-                let events = Rc::clone(&events);
+                let events = Arc::clone(&events);
                 move |_, _| {
-                    events.borrow_mut().push("should");
+                    events.lock().expect("events").push("should");
                     false
                 }
             })
             .on_did_avoid_occluder({
-                let events = Rc::clone(&events);
-                move |_, _| events.borrow_mut().push("did")
+                let events = Arc::clone(&events);
+                move |_, _| events.lock().expect("events").push("did")
             }),
     )
     .expect("avoid delegate");
 
     constraint.set_delegate(Some(&delegate));
     assert!(constraint.delegate().is_some());
-    assert!(!constraint.test_invoke_should_avoid_occluder(&occluder, &subject));
-    constraint.test_invoke_did_avoid_occluder(&occluder, &subject);
+    unsafe {
+        assert!(!common::scn_avoid_occluder_constraint_test_invoke_should(
+            constraint.as_ptr(),
+            occluder.as_ptr(),
+            subject.as_ptr(),
+        ));
+        common::scn_avoid_occluder_constraint_test_invoke_did(
+            constraint.as_ptr(),
+            occluder.as_ptr(),
+            subject.as_ptr(),
+        );
+    }
 
-    let events = events.borrow();
-    assert!(events.contains(&"should"));
-    assert!(events.contains(&"did"));
+    let events = events.lock().expect("events");
+    assert_eq!(events.as_slice(), ["should", "did"]);
 }
 
 #[test]
@@ -155,10 +107,13 @@ fn test_scene_export_and_extended_physics_surface() {
         fs::remove_file(&export_path).expect("remove stale export");
     }
 
-    let export_delegate =
-        SceneExportDelegate::new(|document_url, _original_image_url| Some(document_url.to_owned()))
-            .expect("scene export delegate");
-    assert!(scene.write_to_url(&export_path, Some(&export_delegate)));
+    let export_delegate = SceneExportDelegate::new(|_image, document_url, _original_image_url| {
+        Some(document_url.to_owned())
+    })
+    .expect("scene export delegate");
+    scene
+        .write_to_url(&export_path, Some(&export_delegate))
+        .expect("export scene");
     assert!(export_path.exists());
     fs::remove_file(&export_path).expect("cleanup export");
 

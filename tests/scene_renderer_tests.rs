@@ -1,10 +1,9 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use apple_metal::MetalDevice;
 use scenekit::{
-    ffi, AntialiasingMode, DebugOptions, Renderer, RenderingAPI, SceneRenderer,
-    SceneRendererDelegate, SceneRendererDelegateCallbacks, View,
+    DebugOptions, Renderer, RenderingAPI, SceneRenderer, SceneRendererDelegate,
+    SceneRendererDelegateCallbacks,
 };
 
 mod common;
@@ -43,40 +42,32 @@ fn test_scene_renderer_trait_and_delegate_round_trip() {
         Some(RenderingAPI::Metal)
     );
 
-    let events = Rc::new(RefCell::new(Vec::new()));
+    let events = Arc::new(Mutex::new(Vec::new()));
     let delegate = SceneRendererDelegate::new(
         SceneRendererDelegateCallbacks::new()
             .on_update({
-                let events = Rc::clone(&events);
-                move |_| events.borrow_mut().push("update")
+                let events = Arc::clone(&events);
+                move |_| events.lock().expect("events").push("update")
             })
             .on_will_render_scene({
-                let events = Rc::clone(&events);
-                move |_, _| events.borrow_mut().push("will-render")
+                let events = Arc::clone(&events);
+                move |_, _| events.lock().expect("events").push("will-render")
             })
             .on_did_render_scene({
-                let events = Rc::clone(&events);
-                move |_, _| events.borrow_mut().push("did-render")
+                let events = Arc::clone(&events);
+                move |_, _| events.lock().expect("events").push("did-render")
             }),
     )
     .expect("delegate");
     SceneRenderer::set_delegate(&renderer, Some(&delegate));
+    assert!(SceneRenderer::delegate(&renderer).is_some());
 
     unsafe {
-        ffi::scn_scene_renderer_test_invoke_delegate_update(renderer.as_ptr(), 1.25);
-        ffi::scn_scene_renderer_test_invoke_delegate_will_render_scene(renderer.as_ptr(), 1.25);
-        ffi::scn_scene_renderer_test_invoke_delegate_did_render_scene(renderer.as_ptr(), 1.25);
+        common::scn_scene_renderer_test_invoke_delegate_update(renderer.as_ptr(), 1.25);
+        common::scn_scene_renderer_test_invoke_delegate_will_render_scene(renderer.as_ptr(), 1.25);
+        common::scn_scene_renderer_test_invoke_delegate_did_render_scene(renderer.as_ptr(), 1.25);
     }
 
-    let events = events.borrow();
-    assert!(events.contains(&"update"));
-    assert!(events.contains(&"will-render"));
-    assert!(events.contains(&"did-render"));
-
-    let view = View::new(80.0, 60.0).expect("view");
-    view.set_antialiasing_mode(AntialiasingMode::Multisampling2X);
-    assert_eq!(
-        view.antialiasing_mode(),
-        Some(AntialiasingMode::Multisampling2X)
-    );
+    let events = events.lock().expect("events");
+    assert_eq!(events.as_slice(), ["update", "will-render", "did-render"]);
 }

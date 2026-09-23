@@ -59,6 +59,10 @@ maintenance = { status = "actively-developed" }
 [[example]]
 name = "01_offline_render_smoke"
 
+[[test]]
+name = "main_thread"
+harness = false
+
 [profile.release]
 debug = "full"
 strip = "none"

@@ -1,14 +1,75 @@
 #![allow(dead_code)]
 
 use std::error::Error;
+use std::ffi::{c_char, c_void};
 use std::path::Path;
 
 use apple_cf::cg::CGRect;
-use apple_metal::{pixel_format, storage_mode, texture_usage, MetalDevice, TextureDescriptor};
+use apple_metal::{
+    pixel_format, storage_mode, texture_usage, MetalDevice, MetalTexture, TextureDescriptor,
+};
 use scenekit::{
     read_texture_bytes, Camera, Color, Geometry, Light, LightType, Node, RenderPassDescriptor,
     Renderer, Scene, Vector3, View,
 };
+
+extern "C" {
+    pub fn scn_node_test_invoke_renderer_delegate(node: *mut c_void, renderer: *mut c_void);
+    pub fn scn_avoid_occluder_constraint_test_invoke_should(
+        constraint: *mut c_void,
+        occluder: *mut c_void,
+        node: *mut c_void,
+    ) -> bool;
+    pub fn scn_avoid_occluder_constraint_test_invoke_did(
+        constraint: *mut c_void,
+        occluder: *mut c_void,
+        node: *mut c_void,
+    );
+    pub fn scn_camera_controller_test_invoke_delegate_inertia_will_start(controller: *mut c_void);
+    pub fn scn_camera_controller_test_invoke_delegate_inertia_did_end(controller: *mut c_void);
+    pub fn scn_program_test_invoke_delegate_handle_error(
+        program: *mut c_void,
+        message: *const c_char,
+    );
+    pub fn scn_program_test_invoke_buffer_binding(
+        program: *mut c_void,
+        name: *const c_char,
+    ) -> isize;
+    pub fn scn_scene_renderer_test_invoke_delegate_update(renderer: *mut c_void, time: f64);
+    pub fn scn_scene_renderer_test_invoke_delegate_will_render_scene(
+        renderer: *mut c_void,
+        time: f64,
+    );
+    pub fn scn_scene_renderer_test_invoke_delegate_did_render_scene(
+        renderer: *mut c_void,
+        time: f64,
+    );
+    pub fn scn_physics_world_test_invoke_delegate_did_begin(world: *mut c_void);
+    pub fn scn_physics_world_test_invoke_delegate_did_update(world: *mut c_void);
+    pub fn scn_physics_world_test_invoke_delegate_did_end(world: *mut c_void);
+
+    fn objc_msgSend();
+    fn sel_registerName(name: *const c_char) -> *mut c_void;
+    fn objc_autoreleasePoolPush() -> *mut c_void;
+    fn objc_autoreleasePoolPop(pool: *mut c_void);
+}
+
+pub fn autoreleasepool<R>(body: impl FnOnce() -> R) -> R {
+    let pool = unsafe { objc_autoreleasePoolPush() };
+    let result = body();
+    unsafe { objc_autoreleasePoolPop(pool) };
+    result
+}
+
+pub fn retain_count(object: *mut c_void) -> usize {
+    let send = unsafe {
+        std::mem::transmute::<
+            unsafe extern "C" fn(),
+            unsafe extern "C" fn(*mut c_void, *mut c_void) -> usize,
+        >(objc_msgSend)
+    };
+    unsafe { send(object, sel_registerName(c"retainCount".as_ptr())) }
+}
 
 pub fn scene_with_camera() -> Result<(Scene, Node, Node), Box<dyn Error>> {
     let scene = Scene::new().ok_or("failed to create scene")?;
@@ -25,25 +86,53 @@ pub fn scene_with_camera() -> Result<(Scene, Node, Node), Box<dyn Error>> {
 
 pub fn view_with_camera(width: f64, height: f64) -> Result<(View, Scene, Node), Box<dyn Error>> {
     let (scene, _root, camera_node) = scene_with_camera()?;
-    let view = View::new(width, height).ok_or("failed to create view")?;
+    let view = View::new(width, height)?;
     view.set_scene(Some(&scene));
     view.set_point_of_view(Some(&camera_node));
     Ok((view, scene, camera_node))
 }
 
-pub fn renderer_smoke() -> Result<(), Box<dyn Error>> {
-    let device = MetalDevice::system_default().ok_or("no Metal device")?;
-    let queue = device
-        .new_command_queue()
-        .ok_or("failed to create command queue")?;
-    let texture = device
+pub fn render_target(
+    device: &MetalDevice,
+    size: usize,
+    format: usize,
+) -> Result<MetalTexture, Box<dyn Error>> {
+    Ok(device
         .new_texture(TextureDescriptor {
             usage: texture_usage::RENDER_TARGET | texture_usage::SHADER_READ,
             storage_mode: storage_mode::SHARED,
-            ..TextureDescriptor::new_2d(64, 64, pixel_format::BGRA8UNORM)
+            ..TextureDescriptor::new_2d(size, size, format)
         })
-        .ok_or("failed to create texture")?;
+        .ok_or("failed to create texture")?)
+}
 
+pub fn render_frame(
+    device: &MetalDevice,
+    renderer: &Renderer,
+    texture: &MetalTexture,
+    time: f64,
+) -> Result<(), Box<dyn Error>> {
+    let queue = device
+        .new_command_queue()
+        .ok_or("failed to create command queue")?;
+    let pass = RenderPassDescriptor::for_texture(texture, Color::black()).ok_or("missing pass")?;
+    let command_buffer = queue
+        .new_command_buffer()
+        .ok_or("failed to create command buffer")?;
+    #[allow(clippy::cast_precision_loss)]
+    let size = texture.width() as f64;
+    renderer.render(
+        time,
+        CGRect::new(0.0, 0.0, size, size),
+        &command_buffer,
+        &pass,
+    );
+    command_buffer.commit()?;
+    command_buffer.wait_until_completed()?;
+    Ok(())
+}
+
+pub fn green_cube_scene() -> Result<(Scene, Node, Node), Box<dyn Error>> {
     let (scene, root, camera_node) = scene_with_camera()?;
     let cube = Geometry::box_geometry(1.0, 1.0, 1.0, 0.0).ok_or("missing cube")?;
     cube.first_material()
@@ -60,26 +149,18 @@ pub fn renderer_smoke() -> Result<(), Box<dyn Error>> {
     light_node.set_light(Some(&light));
     light_node.set_position(Vector3::new(0.0, 2.0, 5.0));
     root.add_child_node(&light_node);
+    Ok((scene, cube_node, camera_node))
+}
 
+pub fn renderer_smoke() -> Result<Vec<u8>, Box<dyn Error>> {
+    let device = MetalDevice::system_default().ok_or("no Metal device")?;
+    let texture = render_target(&device, 64, pixel_format::BGRA8UNORM)?;
+    let (scene, _cube_node, camera_node) = green_cube_scene()?;
     let renderer = Renderer::new(Some(&device)).ok_or("missing renderer")?;
     renderer.set_scene(Some(&scene));
     renderer.set_point_of_view(Some(&camera_node));
-    let pass = RenderPassDescriptor::for_texture(&texture, Color::black()).ok_or("missing pass")?;
-    let command_buffer = queue
-        .new_command_buffer()
-        .ok_or("failed to create command buffer")?;
-    renderer.render(
-        0.0,
-        CGRect::new(0.0, 0.0, 64.0, 64.0),
-        &command_buffer,
-        &pass,
-    );
-    command_buffer.commit()?;
-    command_buffer.wait_until_completed()?;
-
-    let pixels = read_texture_bytes(&texture)?;
-    assert!(pixels.iter().any(|&byte| byte != 0));
-    Ok(())
+    render_frame(&device, &renderer, &texture, 0.0)?;
+    Ok(read_texture_bytes(&texture)?)
 }
 
 pub fn system_sound_path() -> &'static Path {

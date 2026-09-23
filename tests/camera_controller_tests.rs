@@ -1,36 +1,16 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use scenekit::{
-    ffi, CGPoint, CGSize, CameraControllerDelegate, CameraControllerDelegateCallbacks,
+    CGPoint, CGSize, CameraController, CameraControllerDelegate, CameraControllerDelegateCallbacks,
     InteractionMode, Vector3,
 };
 
 mod common;
 
 #[test]
-fn test_camera_controller_configuration_and_delegate_round_trip() {
-    let (view, scene, camera_node) = common::view_with_camera(80.0, 60.0).expect("view setup");
-    view.set_allows_camera_control(true);
-
-    let configuration = view
-        .camera_control_configuration()
-        .expect("camera control configuration");
-    configuration.set_auto_switch_to_free_camera(true);
-    configuration.set_allows_translation(true);
-    configuration.set_fly_mode_velocity(4.0);
-    configuration.set_pan_sensitivity(0.5);
-    configuration.set_truck_sensitivity(0.75);
-    configuration.set_rotation_sensitivity(1.25);
-
-    assert!(configuration.auto_switch_to_free_camera());
-    assert!(configuration.allows_translation());
-    assert!((configuration.fly_mode_velocity() - 4.0).abs() < f64::EPSILON);
-    assert!((configuration.pan_sensitivity() - 0.5).abs() < f64::EPSILON);
-    assert!((configuration.truck_sensitivity() - 0.75).abs() < f64::EPSILON);
-    assert!((configuration.rotation_sensitivity() - 1.25).abs() < f64::EPSILON);
-
-    let controller = view.default_camera_controller().expect("camera controller");
+fn test_camera_controller_properties_and_delegate_round_trip() {
+    let (scene, _root, camera_node) = common::scene_with_camera().expect("scene setup");
+    let controller = CameraController::new().expect("camera controller");
     controller.set_point_of_view(Some(&camera_node));
     controller.set_interaction_mode(InteractionMode::Pan);
     controller.set_target(Vector3::new(0.0, 0.0, 0.0));
@@ -75,27 +55,28 @@ fn test_camera_controller_configuration_and_delegate_round_trip() {
         .and_then(|node| node.camera())
         .is_some());
 
-    let delegate_events = Rc::new(RefCell::new(Vec::new()));
+    let delegate_events = Arc::new(Mutex::new(Vec::new()));
     let delegate = CameraControllerDelegate::new(
         CameraControllerDelegateCallbacks::new()
             .on_inertia_will_start({
-                let delegate_events = Rc::clone(&delegate_events);
-                move || delegate_events.borrow_mut().push("will-start")
+                let delegate_events = Arc::clone(&delegate_events);
+                move || delegate_events.lock().expect("events").push("will-start")
             })
             .on_inertia_did_end({
-                let delegate_events = Rc::clone(&delegate_events);
-                move || delegate_events.borrow_mut().push("did-end")
+                let delegate_events = Arc::clone(&delegate_events);
+                move || delegate_events.lock().expect("events").push("did-end")
             }),
     )
     .expect("camera controller delegate");
     controller.set_delegate(Some(&delegate));
 
     unsafe {
-        ffi::scn_camera_controller_test_invoke_delegate_inertia_will_start(controller.as_ptr());
-        ffi::scn_camera_controller_test_invoke_delegate_inertia_did_end(controller.as_ptr());
+        common::scn_camera_controller_test_invoke_delegate_inertia_will_start(controller.as_ptr());
+        common::scn_camera_controller_test_invoke_delegate_inertia_did_end(controller.as_ptr());
     }
 
-    let delegate_events = delegate_events.borrow();
-    assert!(delegate_events.contains(&"will-start"));
-    assert!(delegate_events.contains(&"did-end"));
+    assert_eq!(
+        delegate_events.lock().expect("events").as_slice(),
+        ["will-start", "did-end"]
+    );
 }
