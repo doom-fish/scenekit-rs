@@ -8,6 +8,9 @@ public typealias SceneRendererSceneCallback = @convention(c) (UnsafeMutableRawPo
 private func scnBorrowSceneRenderer(_ handle: UnsafeMutableRawPointer?) -> (NSObjectProtocol & SCNSceneRenderer)? {
     guard let handle else { return nil }
     let object = Unmanaged<AnyObject>.fromOpaque(handle).takeUnretainedValue()
+    if object is SCNView && !Thread.isMainThread {
+        return nil
+    }
     return object as? (NSObjectProtocol & SCNSceneRenderer)
 }
 
@@ -475,12 +478,12 @@ public func scn_scene_renderer_test_invoke_delegate_did_render_scene(_ rendererH
 
 @_cdecl("scn_view_get_antialiasing_mode")
 public func scn_view_get_antialiasing_mode(_ viewHandle: UnsafeMutableRawPointer?) -> Int32 {
-    guard let view: SCNView = scnBorrow(viewHandle) else { return -1 }
-    return Int32(view.antialiasingMode.rawValue)
+    guard let view = scnBorrowView(viewHandle) else { return -1 }
+    return Int32(clamping: view.antialiasingMode.rawValue)
 }
 
 @_cdecl("scn_view_set_antialiasing_mode")
 public func scn_view_set_antialiasing_mode(_ viewHandle: UnsafeMutableRawPointer?, _ antialiasingMode: Int32) {
-    guard let view: SCNView = scnBorrow(viewHandle) else { return }
-    view.antialiasingMode = SCNAntialiasingMode(rawValue: UInt(antialiasingMode)) ?? .none
+    guard let view = scnBorrowView(viewHandle), let rawValue = UInt(exactly: antialiasingMode) else { return }
+    view.antialiasingMode = SCNAntialiasingMode(rawValue: rawValue) ?? .none
 }

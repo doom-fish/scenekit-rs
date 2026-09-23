@@ -56,13 +56,13 @@ public func scn_technique_get_float_symbol(
 
 @_cdecl("scn_view_set_technique")
 public func scn_view_set_technique(_ viewHandle: UnsafeMutableRawPointer?, _ techniqueHandle: UnsafeMutableRawPointer?) {
-    guard let view: SCNView = scnBorrow(viewHandle) else { return }
+    guard let view = scnBorrowView(viewHandle) else { return }
     let technique: SCNTechnique? = scnBorrow(techniqueHandle)
     view.technique = technique
 }
 
 @_cdecl("scn_view_technique")
 public func scn_view_technique(_ viewHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: SCNView = scnBorrow(viewHandle), let technique = view.technique else { return nil }
+    guard let view = scnBorrowView(viewHandle), let technique = view.technique else { return nil }
     return scnRetain(technique)
 }

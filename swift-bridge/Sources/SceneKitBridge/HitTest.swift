@@ -20,7 +20,7 @@ public func scn_view_hit_test(
     _ x: Double,
     _ y: Double
 ) -> UnsafeMutableRawPointer? {
-    guard let view: SCNView = scnBorrow(viewHandle) else { return nil }
+    guard let view = scnBorrowView(viewHandle) else { return nil }
     let results = view.hitTest(CGPoint(x: x, y: y), options: nil)
     return scnRetain(SceneHitTestResultsBox(results: results))
 }

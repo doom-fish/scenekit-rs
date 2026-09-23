@@ -28,7 +28,11 @@ private func scnBorrowBoundingVolume(_ handle: UnsafeMutableRawPointer?) -> (NSO
 
 private func scnBorrowTechniqueSupport(_ handle: UnsafeMutableRawPointer?) -> (NSObjectProtocol & SCNTechniqueSupport)? {
     guard let handle else { return nil }
-    return Unmanaged<AnyObject>.fromOpaque(handle).takeUnretainedValue() as? (NSObjectProtocol & SCNTechniqueSupport)
+    let object = Unmanaged<AnyObject>.fromOpaque(handle).takeUnretainedValue()
+    if object is SCNView && !Thread.isMainThread {
+        return nil
+    }
+    return object as? (NSObjectProtocol & SCNTechniqueSupport)
 }
 
 private func scnBorrowStringArray(_ handle: UnsafeMutableRawPointer?) -> StringArrayBox? {

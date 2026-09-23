@@ -5,7 +5,7 @@ use scenekit::{
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scene = Scene::new().ok_or("missing scene")?;
-    let view = View::new(80.0, 60.0).ok_or("missing view")?;
+    let view = View::new(80.0, 60.0)?;
     view.set_scene(Some(&scene));
     view.set_allows_camera_control(true);
 

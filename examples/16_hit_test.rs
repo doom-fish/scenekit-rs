@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     camera_node.set_position(Vector3::new(0.0, 0.0, 5.0));
     root.add_child_node(&camera_node);
 
-    let view = View::new(100.0, 100.0).ok_or("missing view")?;
+    let view = View::new(100.0, 100.0)?;
     view.set_scene(Some(&scene));
     view.set_point_of_view(Some(&camera_node));
     let hits = view

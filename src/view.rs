@@ -1,18 +1,24 @@
 use core::ptr;
 
 use crate::color::Color;
+use crate::error::SceneKitError;
 use crate::ffi;
 use crate::node::Node;
-use crate::private::handle_type;
+use crate::private::{handle_type, is_main_thread};
 use crate::scene::Scene;
 
 handle_type!(View);
 
 impl View {
     /// Creates a wrapped `SCNView` instance.
-    #[must_use]
-    pub fn new(width: f64, height: f64) -> Option<Self> {
+    pub fn new(width: f64, height: f64) -> Result<Self, SceneKitError> {
+        if !is_main_thread() {
+            return Err(SceneKitError::new(
+                "SCNView must be created and used on the main thread",
+            ));
+        }
         unsafe { Self::from_raw(ffi::scn_view_new(width, height)) }
+            .ok_or_else(|| SceneKitError::new("SCNView(frame:options:) returned nil"))
     }
 
     /// Sets the `SCNView.scene` member.

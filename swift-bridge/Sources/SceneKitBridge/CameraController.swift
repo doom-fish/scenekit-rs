@@ -72,7 +72,7 @@ public func scn_view_camera_control_configuration(_ viewHandle: UnsafeMutableRaw
 
 @_cdecl("scn_view_default_camera_controller")
 public func scn_view_default_camera_controller(_ viewHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: SCNView = scnBorrow(viewHandle) else { return nil }
+    guard let view = scnBorrowView(viewHandle) else { return nil }
     return scnRetain(view.defaultCameraController)
 }
 
