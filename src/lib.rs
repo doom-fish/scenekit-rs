@@ -126,7 +126,10 @@ pub use scene_renderer::{
     MetalDeviceHandle, MetalRenderCommandEncoder, Prepareable, RenderingAPI, SceneRenderer,
     SceneRendererDelegate, SceneRendererDelegateCallbacks,
 };
-pub use scene_source::{SceneSource, SceneSourceEntryClass, SceneSourceStatus};
+pub use scene_source::{
+    SceneSource, SceneSourceAnimationImportPolicy, SceneSourceEntryClass, SceneSourceOptions,
+    SceneSourceStatus,
+};
 pub use spritekit::{SpriteScene, SpriteTransition};
 pub use symbols::*;
 pub use technique::Technique;
@@ -149,20 +152,19 @@ pub mod prelude {
         BufferStream, Camera, CameraControlConfiguration, CameraController,
         CameraControllerDelegate, CameraControllerDelegateCallbacks, Capsule, Color, Constraint,
         DebugOptions, Geometry, GeometryElement, GeometrySource, GeometrySourceLayout,
-        GeometrySourceSemantic, GeometryTessellator, HitTestResult, HitTestResults,
-        IKConstraint, InteractionMode, LevelOfDetail, Light, LightType, LoadAction, Material,
-        MaterialProperty, Matrix4, Morpher, Node,
-        NodeRendererDelegate, NodeRendererDelegateCallbacks, ParticlePropertyController,
-        ParticleSystem, PhysicsBallSocketJoint, PhysicsBehavior, PhysicsBody, PhysicsBodyType,
-        PhysicsConeTwistJoint, PhysicsContact, PhysicsContactDelegate,
-        PhysicsContactDelegateCallbacks, PhysicsField, PhysicsHingeJoint, PhysicsShape,
-        PhysicsSliderJoint, PhysicsVehicle, PhysicsVehicleWheel, PhysicsWorld, Prepareable,
-        Program, ProgramBufferBinding, ProgramDelegate, Pyramid, ReferenceNode,
+        GeometrySourceSemantic, GeometryTessellator, HitTestResult, HitTestResults, IKConstraint,
+        InteractionMode, LevelOfDetail, Light, LightType, LoadAction, Material, MaterialProperty,
+        Matrix4, Morpher, Node, NodeRendererDelegate, NodeRendererDelegateCallbacks,
+        ParticlePropertyController, ParticleSystem, PhysicsBallSocketJoint, PhysicsBehavior,
+        PhysicsBody, PhysicsBodyType, PhysicsConeTwistJoint, PhysicsContact,
+        PhysicsContactDelegate, PhysicsContactDelegateCallbacks, PhysicsField, PhysicsHingeJoint,
+        PhysicsShape, PhysicsSliderJoint, PhysicsVehicle, PhysicsVehicleWheel, PhysicsWorld,
+        Prepareable, Program, ProgramBufferBinding, ProgramDelegate, Pyramid, ReferenceNode,
         RenderPassDescriptor, Renderer, RenderingAPI, ReplicatorConstraint, Scene,
         SceneExportDelegate, SceneKitError, SceneRenderer, SceneRendererDelegate,
-        SceneRendererDelegateCallbacks, SceneSource, SceneSourceEntryClass, SceneSourceStatus,
-        Shadable, ShadowMode, Shape, Skinner, SliderConstraint, SpriteScene, SpriteTransition,
-        StoreAction, Technique, Torus, Transaction, TransformConstraint, Tube, Vector3, Vector4,
-        View,
+        SceneRendererDelegateCallbacks, SceneSource, SceneSourceAnimationImportPolicy,
+        SceneSourceEntryClass, SceneSourceOptions, SceneSourceStatus, Shadable, ShadowMode, Shape,
+        Skinner, SliderConstraint, SpriteScene, SpriteTransition, StoreAction, Technique, Torus,
+        Transaction, TransformConstraint, Tube, Vector3, Vector4, View,
     };
 }

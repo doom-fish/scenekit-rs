@@ -19,13 +19,58 @@ private func scnSceneSourceEntryClass(_ rawValue: Int32) -> AnyClass? {
     }
 }
 
+func scnSceneSourceOptions(
+    _ keys: UnsafePointer<Int32>?,
+    _ values: UnsafePointer<Double>?,
+    _ count: Int,
+    _ directories: UnsafePointer<UnsafePointer<CChar>?>?,
+    _ directoryCount: Int
+) -> [SCNSceneSource.LoadingOption: Any] {
+    var options: [SCNSceneSource.LoadingOption: Any] = [:]
+    if let keys, let values, count > 0 {
+        for index in 0..<count {
+            let value = values[index]
+            switch keys[index] {
+            case 0: options[.checkConsistency] = NSNumber(value: value != 0)
+            case 1: options[.convertToYUp] = NSNumber(value: value != 0)
+            case 2: options[.convertUnitsToMeters] = NSNumber(value: value)
+            case 3: options[.createNormalsIfAbsent] = NSNumber(value: value != 0)
+            case 4: options[.flattenScene] = NSNumber(value: value != 0)
+            case 5: options[.overrideAssetURLs] = NSNumber(value: value != 0)
+            case 6: options[.preserveOriginalTopology] = NSNumber(value: value != 0)
+            case 7: options[.strictConformance] = NSNumber(value: value != 0)
+            case 8:
+                let policies: [SCNSceneSource.AnimationImportPolicy] = [.play, .playRepeatedly, .doNotPlay, .playUsingSceneTimeBase]
+                if let position = Int(exactly: value), policies.indices.contains(position) {
+                    options[.animationImportPolicy] = policies[position].rawValue
+                }
+            default:
+                continue
+            }
+        }
+    }
+    if let directories, directoryCount > 0 {
+        options[.assetDirectoryURLs] = (0..<directoryCount).compactMap { index -> URL? in
+            guard let path = directories[index] else { return nil }
+            return URL(fileURLWithPath: String(cString: path), isDirectory: true)
+        }
+    }
+    return options
+}
+
 @_cdecl("scn_scene_source_new_url")
 public func scn_scene_source_new_url(
     _ path: UnsafePointer<CChar>?,
+    _ keys: UnsafePointer<Int32>?,
+    _ values: UnsafePointer<Double>?,
+    _ count: Int,
+    _ directories: UnsafePointer<UnsafePointer<CChar>?>?,
+    _ directoryCount: Int,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
     guard let path else { return nil }
-    guard let sceneSource = SCNSceneSource(url: URL(fileURLWithPath: String(cString: path)), options: nil) else {
+    let options = scnSceneSourceOptions(keys, values, count, directories, directoryCount)
+    guard let sceneSource = SCNSceneSource(url: URL(fileURLWithPath: String(cString: path)), options: options) else {
         outError?.pointee = scnDup("SCNSceneSource(url:options:) returned nil")
         return nil
     }
@@ -37,10 +82,16 @@ public func scn_scene_source_new_url(
 public func scn_scene_source_new_data(
     _ bytes: UnsafeRawPointer?,
     _ length: Int,
+    _ keys: UnsafePointer<Int32>?,
+    _ values: UnsafePointer<Double>?,
+    _ count: Int,
+    _ directories: UnsafePointer<UnsafePointer<CChar>?>?,
+    _ directoryCount: Int,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
-    guard let bytes else { return nil }
-    guard let sceneSource = SCNSceneSource(data: Data(bytes: bytes, count: length), options: nil) else {
+    guard let bytes, length >= 0 else { return nil }
+    let options = scnSceneSourceOptions(keys, values, count, directories, directoryCount)
+    guard let sceneSource = SCNSceneSource(data: Data(bytes: bytes, count: length), options: options) else {
         outError?.pointee = scnDup("SCNSceneSource(data:options:) returned nil")
         return nil
     }
@@ -57,11 +108,16 @@ public func scn_scene_source_copy_url(_ sceneSourceHandle: UnsafeMutableRawPoint
 @_cdecl("scn_scene_source_new_scene")
 public func scn_scene_source_new_scene(
     _ sceneSourceHandle: UnsafeMutableRawPointer?,
+    _ keys: UnsafePointer<Int32>?,
+    _ values: UnsafePointer<Double>?,
+    _ count: Int,
+    _ directories: UnsafePointer<UnsafePointer<CChar>?>?,
+    _ directoryCount: Int,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
     guard let sceneSource: SCNSceneSource = scnBorrow(sceneSourceHandle) else { return nil }
     do {
-        let scene = try sceneSource.scene(options: nil)
+        let scene = try sceneSource.scene(options: scnSceneSourceOptions(keys, values, count, directories, directoryCount))
         outError?.pointee = nil
         return scnRetain(scene)
     } catch {

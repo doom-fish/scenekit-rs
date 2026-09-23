@@ -16,11 +16,17 @@ public func scn_scene_new_named(_ name: UnsafePointer<CChar>?) -> UnsafeMutableR
 @_cdecl("scn_scene_new_url")
 public func scn_scene_new_url(
     _ path: UnsafePointer<CChar>?,
+    _ keys: UnsafePointer<Int32>?,
+    _ values: UnsafePointer<Double>?,
+    _ count: Int,
+    _ directories: UnsafePointer<UnsafePointer<CChar>?>?,
+    _ directoryCount: Int,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> UnsafeMutableRawPointer? {
     guard let path else { return nil }
     do {
-        let scene = try SCNScene(url: URL(fileURLWithPath: String(cString: path)), options: nil)
+        let options = scnSceneSourceOptions(keys, values, count, directories, directoryCount)
+        let scene = try SCNScene(url: URL(fileURLWithPath: String(cString: path)), options: options)
         return scnRetain(scene)
     } catch {
         outError?.pointee = scnDup(error.localizedDescription)

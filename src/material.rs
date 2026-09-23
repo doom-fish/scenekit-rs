@@ -4,8 +4,9 @@ use apple_cf::cg::CGImage;
 use apple_metal::MetalTexture;
 
 use crate::color::Color;
+use crate::error::{take_string, SceneKitError};
 use crate::ffi;
-use crate::private::{cstring_from_path, handle_type};
+use crate::private::{cstring_from_path, cstring_from_str, handle_type};
 
 handle_type!(Material);
 handle_type!(MaterialProperty);
@@ -15,6 +16,23 @@ impl Material {
     #[must_use]
     pub fn new() -> Option<Self> {
         unsafe { Self::from_raw(ffi::scn_material_new()) }
+    }
+
+    #[must_use]
+    pub fn lighting_model(&self) -> Option<String> {
+        unsafe { take_string(ffi::scn_material_copy_lighting_model(self.ptr)) }
+    }
+
+    pub fn set_lighting_model(&self, lighting_model: &str) -> Result<(), SceneKitError> {
+        let model = cstring_from_str(lighting_model)
+            .ok_or_else(|| SceneKitError::new("lighting model contains an interior NUL byte"))?;
+        if unsafe { ffi::scn_material_set_lighting_model(self.ptr, model.as_ptr()) } {
+            Ok(())
+        } else {
+            Err(SceneKitError::new(format!(
+                "{lighting_model} is not an SCNMaterial.LightingModel"
+            )))
+        }
     }
 
     /// Mirrors `SCNMaterial.diffuse`.

@@ -9,6 +9,7 @@ use crate::light::Light;
 use crate::math::{Matrix4, Vector3, Vector4};
 use crate::physics::PhysicsBody;
 use crate::private::{cstring_from_str, handle_type};
+use crate::scene_renderer::NodeArray;
 
 handle_type!(Node);
 
@@ -202,5 +203,64 @@ impl Node {
     /// Mirrors `SCNNode.runAction`.
     pub fn run_action(&self, action: &Action) {
         unsafe { ffi::scn_node_run_action(self.ptr, action.as_ptr()) };
+    }
+
+    #[must_use]
+    pub fn child_nodes(&self) -> Vec<Self> {
+        unsafe { NodeArray::from_raw(ffi::scn_node_child_nodes(self.ptr)) }
+            .map_or_else(Vec::new, |nodes| nodes.nodes())
+    }
+
+    #[must_use]
+    pub fn parent(&self) -> Option<Self> {
+        unsafe { Self::from_raw(ffi::scn_node_get_parent(self.ptr)) }
+    }
+
+    #[must_use]
+    pub fn child_node_with_name(&self, name: &str, recursively: bool) -> Option<Self> {
+        let name = cstring_from_str(name)?;
+        unsafe {
+            Self::from_raw(ffi::scn_node_child_node_with_name(
+                self.ptr,
+                name.as_ptr(),
+                recursively,
+            ))
+        }
+    }
+
+    #[must_use]
+    pub fn clone_node(&self) -> Option<Self> {
+        unsafe { Self::from_raw(ffi::scn_node_clone(self.ptr)) }
+    }
+
+    #[must_use]
+    pub fn world_transform(&self) -> Matrix4 {
+        let mut matrix = Matrix4::default();
+        let _ = unsafe { ffi::scn_node_get_world_transform(self.ptr, matrix.as_mut_ptr().cast()) };
+        matrix
+    }
+
+    pub fn set_world_transform(&self, transform: Matrix4) {
+        unsafe {
+            ffi::scn_node_set_world_transform(self.ptr, transform.as_ptr().cast_mut().cast());
+        };
+    }
+
+    #[must_use]
+    pub fn opacity(&self) -> f64 {
+        unsafe { ffi::scn_node_get_opacity(self.ptr) }
+    }
+
+    pub fn set_opacity(&self, opacity: f64) {
+        unsafe { ffi::scn_node_set_opacity(self.ptr, opacity) };
+    }
+
+    #[must_use]
+    pub fn category_bit_mask(&self) -> usize {
+        unsafe { ffi::scn_node_get_category_bit_mask(self.ptr) }
+    }
+
+    pub fn set_category_bit_mask(&self, mask: usize) {
+        unsafe { ffi::scn_node_set_category_bit_mask(self.ptr, mask) };
     }
 }

@@ -7,6 +7,21 @@ public func scn_material_new() -> UnsafeMutableRawPointer? {
     scnRetain(SCNMaterial())
 }
 
+@_cdecl("scn_material_copy_lighting_model")
+public func scn_material_copy_lighting_model(_ materialHandle: UnsafeMutableRawPointer?) -> UnsafeMutablePointer<CChar>? {
+    guard let material: SCNMaterial = scnBorrow(materialHandle) else { return nil }
+    return scnDup(material.lightingModel.rawValue)
+}
+
+@_cdecl("scn_material_set_lighting_model")
+public func scn_material_set_lighting_model(_ materialHandle: UnsafeMutableRawPointer?, _ model: UnsafePointer<CChar>?) -> Bool {
+    guard let material: SCNMaterial = scnBorrow(materialHandle), let model else { return false }
+    let known: [SCNMaterial.LightingModel] = [.blinn, .constant, .lambert, .phong, .physicallyBased, .shadowOnly]
+    guard let lightingModel = known.first(where: { $0.rawValue == String(cString: model) }) else { return false }
+    material.lightingModel = lightingModel
+    return true
+}
+
 @_cdecl("scn_material_diffuse")
 public func scn_material_diffuse(_ materialHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
     guard let material: SCNMaterial = scnBorrow(materialHandle) else { return nil }

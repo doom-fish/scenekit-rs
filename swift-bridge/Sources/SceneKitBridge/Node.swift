@@ -180,3 +180,71 @@ public func scn_node_run_action(_ nodeHandle: UnsafeMutableRawPointer?, _ action
     else { return }
     node.runAction(action)
 }
+
+@_cdecl("scn_node_child_nodes")
+public func scn_node_child_nodes(_ nodeHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    guard let node: SCNNode = scnBorrow(nodeHandle) else { return nil }
+    return scnRetain(node.childNodes as NSArray)
+}
+
+@_cdecl("scn_node_get_parent")
+public func scn_node_get_parent(_ nodeHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    guard let node: SCNNode = scnBorrow(nodeHandle), let parent = node.parent else { return nil }
+    return scnRetain(parent)
+}
+
+@_cdecl("scn_node_child_node_with_name")
+public func scn_node_child_node_with_name(
+    _ nodeHandle: UnsafeMutableRawPointer?,
+    _ name: UnsafePointer<CChar>?,
+    _ recursively: Bool
+) -> UnsafeMutableRawPointer? {
+    guard let node: SCNNode = scnBorrow(nodeHandle), let name,
+          let child = node.childNode(withName: String(cString: name), recursively: recursively)
+    else { return nil }
+    return scnRetain(child)
+}
+
+@_cdecl("scn_node_clone")
+public func scn_node_clone(_ nodeHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    guard let node: SCNNode = scnBorrow(nodeHandle) else { return nil }
+    let clone = node.clone()
+    scnAdoptRendererDelegates(from: node, to: clone)
+    return scnRetain(clone)
+}
+
+@_cdecl("scn_node_get_world_transform")
+public func scn_node_get_world_transform(_ nodeHandle: UnsafeMutableRawPointer?, _ outMatrix: UnsafeMutableRawPointer?) -> Bool {
+    guard let node: SCNNode = scnBorrow(nodeHandle) else { return false }
+    return scnWriteMatrix4(node.worldTransform, out: outMatrix)
+}
+
+@_cdecl("scn_node_set_world_transform")
+public func scn_node_set_world_transform(_ nodeHandle: UnsafeMutableRawPointer?, _ matrixHandle: UnsafeMutableRawPointer?) {
+    guard let node: SCNNode = scnBorrow(nodeHandle), let matrix = scnReadMatrix4(matrixHandle) else { return }
+    node.setWorldTransform(matrix)
+}
+
+@_cdecl("scn_node_get_opacity")
+public func scn_node_get_opacity(_ nodeHandle: UnsafeMutableRawPointer?) -> Double {
+    guard let node: SCNNode = scnBorrow(nodeHandle) else { return 1 }
+    return Double(node.opacity)
+}
+
+@_cdecl("scn_node_set_opacity")
+public func scn_node_set_opacity(_ nodeHandle: UnsafeMutableRawPointer?, _ opacity: Double) {
+    guard let node: SCNNode = scnBorrow(nodeHandle) else { return }
+    node.opacity = CGFloat(opacity)
+}
+
+@_cdecl("scn_node_get_category_bit_mask")
+public func scn_node_get_category_bit_mask(_ nodeHandle: UnsafeMutableRawPointer?) -> UInt {
+    guard let node: SCNNode = scnBorrow(nodeHandle) else { return 0 }
+    return UInt(bitPattern: node.categoryBitMask)
+}
+
+@_cdecl("scn_node_set_category_bit_mask")
+public func scn_node_set_category_bit_mask(_ nodeHandle: UnsafeMutableRawPointer?, _ mask: UInt) {
+    guard let node: SCNNode = scnBorrow(nodeHandle) else { return }
+    node.categoryBitMask = Int(bitPattern: mask)
+}

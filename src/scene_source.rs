@@ -1,4 +1,6 @@
-use std::path::Path;
+use core::ffi::c_char;
+use std::ffi::CString;
+use std::path::{Path, PathBuf};
 
 use crate::error::{take_error, take_string, SceneKitError};
 use crate::ffi;
@@ -62,6 +64,92 @@ pub enum SceneSourceEntryClass {
     Morpher = 8,
     /// Corresponds to the `SCNSceneSource entry classes::Image` case.
     Image = 9,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SceneSourceAnimationImportPolicy {
+    Play,
+    PlayRepeatedly,
+    DoNotPlay,
+    PlayUsingSceneTimeBase,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SceneSourceOptions {
+    pub animation_import_policy: Option<SceneSourceAnimationImportPolicy>,
+    pub asset_directory_urls: Vec<PathBuf>,
+    pub check_consistency: Option<bool>,
+    pub convert_to_y_up: Option<bool>,
+    pub convert_units_to_meters: Option<f64>,
+    pub create_normals_if_absent: Option<bool>,
+    pub flatten_scene: Option<bool>,
+    pub override_asset_urls: Option<bool>,
+    pub preserve_original_topology: Option<bool>,
+    pub strict_conformance: Option<bool>,
+}
+
+pub(crate) struct EncodedSceneSourceOptions {
+    pub(crate) keys: Vec<i32>,
+    pub(crate) values: Vec<f64>,
+    _directories: Vec<CString>,
+    pub(crate) directory_ptrs: Vec<*const c_char>,
+}
+
+impl SceneSourceOptions {
+    pub(crate) fn encode(&self) -> Result<EncodedSceneSourceOptions, SceneKitError> {
+        let flags = [
+            self.check_consistency,
+            self.convert_to_y_up,
+            None,
+            self.create_normals_if_absent,
+            self.flatten_scene,
+            self.override_asset_urls,
+            self.preserve_original_topology,
+            self.strict_conformance,
+        ];
+        let mut keys = Vec::new();
+        let mut values = Vec::new();
+        for (key, flag) in (0_i32..).zip(flags) {
+            if let Some(flag) = flag {
+                keys.push(key);
+                values.push(if flag { 1.0 } else { 0.0 });
+            }
+        }
+        if let Some(meters) = self.convert_units_to_meters {
+            if !meters.is_finite() || meters <= 0.0 {
+                return Err(SceneKitError::new(
+                    "convert_units_to_meters must be a positive, finite number of meters",
+                ));
+            }
+            keys.push(2);
+            values.push(meters);
+        }
+        if let Some(policy) = self.animation_import_policy {
+            keys.push(8);
+            values.push(match policy {
+                SceneSourceAnimationImportPolicy::Play => 0.0,
+                SceneSourceAnimationImportPolicy::PlayRepeatedly => 1.0,
+                SceneSourceAnimationImportPolicy::DoNotPlay => 2.0,
+                SceneSourceAnimationImportPolicy::PlayUsingSceneTimeBase => 3.0,
+            });
+        }
+        let directories = self
+            .asset_directory_urls
+            .iter()
+            .map(|path| {
+                cstring_from_path(path).ok_or_else(|| {
+                    SceneKitError::new("asset directory path contains an interior NUL byte")
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let directory_ptrs = directories.iter().map(|path| path.as_ptr()).collect();
+        Ok(EncodedSceneSourceOptions {
+            keys,
+            values,
+            _directories: directories,
+            directory_ptrs,
+        })
+    }
 }
 
 macro_rules! string_constant_fn {
@@ -180,10 +268,28 @@ string_constant_fn!(
 impl SceneSource {
     /// Mirrors `SCNSceneSource.fromUrl`.
     pub fn from_url(path: impl AsRef<Path>) -> Result<Self, SceneKitError> {
+        Self::from_url_with_options(path, &SceneSourceOptions::default())
+    }
+
+    pub fn from_url_with_options(
+        path: impl AsRef<Path>,
+        options: &SceneSourceOptions,
+    ) -> Result<Self, SceneKitError> {
         let path = cstring_from_path(path.as_ref())
             .ok_or_else(|| SceneKitError::new("path contains an interior NUL byte"))?;
+        let options = options.encode()?;
         let mut error = core::ptr::null_mut();
-        let ptr = unsafe { ffi::scn_scene_source_new_url(path.as_ptr(), &raw mut error) };
+        let ptr = unsafe {
+            ffi::scn_scene_source_new_url(
+                path.as_ptr(),
+                options.keys.as_ptr(),
+                options.values.as_ptr(),
+                options.keys.len(),
+                options.directory_ptrs.as_ptr(),
+                options.directory_ptrs.len(),
+                &raw mut error,
+            )
+        };
         if ptr.is_null() {
             Err(unsafe { take_error(error, "SCNSceneSource(url:options:) returned nil") })
         } else {
@@ -193,9 +299,27 @@ impl SceneSource {
 
     /// Mirrors `SCNSceneSource.fromData`.
     pub fn from_data(data: &[u8]) -> Result<Self, SceneKitError> {
+        Self::from_data_with_options(data, &SceneSourceOptions::default())
+    }
+
+    pub fn from_data_with_options(
+        data: &[u8],
+        options: &SceneSourceOptions,
+    ) -> Result<Self, SceneKitError> {
+        let options = options.encode()?;
         let mut error = core::ptr::null_mut();
-        let ptr =
-            unsafe { ffi::scn_scene_source_new_data(data.as_ptr().cast(), data.len(), &raw mut error) };
+        let ptr = unsafe {
+            ffi::scn_scene_source_new_data(
+                data.as_ptr().cast(),
+                data.len(),
+                options.keys.as_ptr(),
+                options.values.as_ptr(),
+                options.keys.len(),
+                options.directory_ptrs.as_ptr(),
+                options.directory_ptrs.len(),
+                &raw mut error,
+            )
+        };
         if ptr.is_null() {
             Err(unsafe { take_error(error, "SCNSceneSource(data:options:) returned nil") })
         } else {
@@ -211,8 +335,23 @@ impl SceneSource {
 
     /// Mirrors `SCNSceneSource.scene`.
     pub fn scene(&self) -> Result<Scene, SceneKitError> {
+        self.scene_with_options(&SceneSourceOptions::default())
+    }
+
+    pub fn scene_with_options(&self, options: &SceneSourceOptions) -> Result<Scene, SceneKitError> {
+        let options = options.encode()?;
         let mut error = core::ptr::null_mut();
-        let ptr = unsafe { ffi::scn_scene_source_new_scene(self.ptr, &raw mut error) };
+        let ptr = unsafe {
+            ffi::scn_scene_source_new_scene(
+                self.ptr,
+                options.keys.as_ptr(),
+                options.values.as_ptr(),
+                options.keys.len(),
+                options.directory_ptrs.as_ptr(),
+                options.directory_ptrs.len(),
+                &raw mut error,
+            )
+        };
         if ptr.is_null() {
             Err(unsafe { take_error(error, "SCNSceneSource.scene(options:error:) returned nil") })
         } else {

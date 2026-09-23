@@ -220,7 +220,7 @@ handle_type!(MetalCommandQueue, "MTLCommandQueue");
 handle_type!(MetalRenderCommandEncoder, "MTLRenderCommandEncoder");
 
 impl NodeArray {
-    fn nodes(&self) -> Vec<Node> {
+    pub(crate) fn nodes(&self) -> Vec<Node> {
         (0..unsafe { scn_array_count(self.ptr) })
             .filter_map(|index| unsafe { Node::from_raw(scn_array_get(self.ptr, index)) })
             .collect()

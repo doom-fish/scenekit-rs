@@ -6,6 +6,7 @@ use crate::ffi;
 use crate::material::MaterialProperty;
 use crate::node::Node;
 use crate::private::{cstring_from_path, cstring_from_str, handle_type};
+use crate::scene_source::SceneSourceOptions;
 
 handle_type!(Scene);
 
@@ -25,12 +26,30 @@ impl Scene {
 
     /// Mirrors `SCNScene.fromUrl`.
     pub fn from_url(path: impl AsRef<Path>) -> Result<Self, SceneKitError> {
+        Self::from_url_with_options(path, &SceneSourceOptions::default())
+    }
+
+    pub fn from_url_with_options(
+        path: impl AsRef<Path>,
+        options: &SceneSourceOptions,
+    ) -> Result<Self, SceneKitError> {
         let path = cstring_from_path(path.as_ref())
             .ok_or_else(|| SceneKitError::new("path contains an interior NUL byte"))?;
+        let options = options.encode()?;
         let mut error = core::ptr::null_mut();
-        let ptr = unsafe { ffi::scn_scene_new_url(path.as_ptr(), &raw mut error) };
+        let ptr = unsafe {
+            ffi::scn_scene_new_url(
+                path.as_ptr(),
+                options.keys.as_ptr(),
+                options.values.as_ptr(),
+                options.keys.len(),
+                options.directory_ptrs.as_ptr(),
+                options.directory_ptrs.len(),
+                &raw mut error,
+            )
+        };
         if ptr.is_null() {
-            Err(unsafe { take_error(error, "SCNScene(url:) returned nil") })
+            Err(unsafe { take_error(error, "SCNScene(url:options:) returned nil") })
         } else {
             Ok(unsafe { Self::from_raw_unchecked(ptr) })
         }

@@ -25,7 +25,15 @@ extern "C" {
 
     pub fn scn_scene_new() -> *mut c_void;
     pub fn scn_scene_new_named(name: *const c_char) -> *mut c_void;
-    pub fn scn_scene_new_url(path: *const c_char, out_error: *mut *mut c_char) -> *mut c_void;
+    pub fn scn_scene_new_url(
+        path: *const c_char,
+        option_keys: *const i32,
+        option_values: *const f64,
+        option_count: usize,
+        asset_directories: *const *const c_char,
+        asset_directory_count: usize,
+        out_error: *mut *mut c_char,
+    ) -> *mut c_void;
     pub fn scn_scene_root_node(scene: *mut c_void) -> *mut c_void;
     pub fn scn_scene_background(scene: *mut c_void) -> *mut c_void;
     pub fn scn_scene_lighting_environment(scene: *mut c_void) -> *mut c_void;
@@ -61,6 +69,20 @@ extern "C" {
     pub fn scn_node_get_physics_body(node: *mut c_void) -> *mut c_void;
     pub fn scn_node_set_physics_body(node: *mut c_void, physics_body: *mut c_void);
     pub fn scn_node_run_action(node: *mut c_void, action: *mut c_void);
+    pub fn scn_node_child_nodes(node: *mut c_void) -> *mut c_void;
+    pub fn scn_node_get_parent(node: *mut c_void) -> *mut c_void;
+    pub fn scn_node_child_node_with_name(
+        node: *mut c_void,
+        name: *const c_char,
+        recursively: bool,
+    ) -> *mut c_void;
+    pub fn scn_node_clone(node: *mut c_void) -> *mut c_void;
+    pub fn scn_node_get_world_transform(node: *mut c_void, out_matrix: *mut c_void) -> bool;
+    pub fn scn_node_set_world_transform(node: *mut c_void, matrix: *mut c_void);
+    pub fn scn_node_get_opacity(node: *mut c_void) -> f64;
+    pub fn scn_node_set_opacity(node: *mut c_void, opacity: f64);
+    pub fn scn_node_get_category_bit_mask(node: *mut c_void) -> usize;
+    pub fn scn_node_set_category_bit_mask(node: *mut c_void, mask: usize);
 
     pub fn scn_geometry_new_box(
         width: f64,
@@ -79,6 +101,8 @@ extern "C" {
     pub fn scn_geometry_set_first_material(geometry: *mut c_void, material: *mut c_void);
 
     pub fn scn_material_new() -> *mut c_void;
+    pub fn scn_material_copy_lighting_model(material: *mut c_void) -> *mut c_char;
+    pub fn scn_material_set_lighting_model(material: *mut c_void, model: *const c_char) -> bool;
     pub fn scn_material_diffuse(material: *mut c_void) -> *mut c_void;
     pub fn scn_material_normal(material: *mut c_void) -> *mut c_void;
     pub fn scn_material_specular(material: *mut c_void) -> *mut c_void;
@@ -500,16 +524,31 @@ extern "C" {
 
     pub fn scn_scene_source_new_url(
         path: *const c_char,
+        option_keys: *const i32,
+        option_values: *const f64,
+        option_count: usize,
+        asset_directories: *const *const c_char,
+        asset_directory_count: usize,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
     pub fn scn_scene_source_new_data(
         bytes: *const c_void,
         length: usize,
+        option_keys: *const i32,
+        option_values: *const f64,
+        option_count: usize,
+        asset_directories: *const *const c_char,
+        asset_directory_count: usize,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
     pub fn scn_scene_source_copy_url(scene_source: *mut c_void) -> *mut c_char;
     pub fn scn_scene_source_new_scene(
         scene_source: *mut c_void,
+        option_keys: *const i32,
+        option_values: *const f64,
+        option_count: usize,
+        asset_directories: *const *const c_char,
+        asset_directory_count: usize,
         out_error: *mut *mut c_char,
     ) -> *mut c_void;
     pub fn scn_scene_source_copy_property_for_key(
