@@ -1,9 +1,132 @@
+use core::ffi::c_void;
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
+use std::sync::{Mutex, PoisonError};
+use std::thread::{self, ThreadId};
+
+use doom_fish_utils::callback_context::CallbackContext;
 
 /// Marker trait sealing internal SceneKit extension implementations.
 pub trait Sealed {}
+
+pub struct CallbackCell<T> {
+    value: Mutex<T>,
+    running_on: Mutex<Option<ThreadId>>,
+}
+
+struct RunningReset<'a>(&'a Mutex<Option<ThreadId>>);
+
+impl Drop for RunningReset<'_> {
+    fn drop(&mut self) {
+        *self.0.lock().unwrap_or_else(PoisonError::into_inner) = None;
+    }
+}
+
+impl<T> CallbackCell<T> {
+    pub(crate) const fn new(value: T) -> Self {
+        Self {
+            value: Mutex::new(value),
+            running_on: Mutex::new(None),
+        }
+    }
+
+    fn with<R>(&self, f: impl FnOnce(&mut T) -> R) -> Option<R> {
+        let current = thread::current().id();
+        if *self
+            .running_on
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            == Some(current)
+        {
+            return None;
+        }
+        let mut value = self.value.lock().ok()?;
+        *self
+            .running_on
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(current);
+        let _reset = RunningReset(&self.running_on);
+        Some(f(&mut value))
+    }
+}
+
+pub type CallbackState<T> = CallbackContext<CallbackCell<T>>;
+
+pub unsafe fn invoke_callback<T: Send + 'static, R>(
+    context: *mut c_void,
+    site: &str,
+    f: impl FnOnce(&mut T) -> R,
+) -> Option<R> {
+    if context.is_null() {
+        return None;
+    }
+    unsafe { CallbackState::<T>::RETAIN(context) };
+    let result = unsafe { CallbackState::<T>::with(context, site, |cell| cell.with(f)) };
+    unsafe { CallbackState::<T>::RELEASE(context) };
+    result.flatten()
+}
+
+pub struct DelegateObject<T: Send + 'static> {
+    ptr: *mut c_void,
+    context: Option<CallbackState<T>>,
+}
+
+impl<T: Send + 'static> DelegateObject<T> {
+    pub(crate) fn new(value: T, create: impl FnOnce(*mut c_void) -> *mut c_void) -> Option<Self> {
+        let context = CallbackState::new(CallbackCell::new(value));
+        let retained = context.retained_ptr();
+        let ptr = create(retained);
+        if ptr.is_null() {
+            unsafe { CallbackState::<T>::RELEASE(retained) };
+            return None;
+        }
+        Some(Self {
+            ptr,
+            context: Some(context),
+        })
+    }
+
+    pub(crate) fn from_retained(ptr: *mut c_void) -> Option<Self> {
+        (!ptr.is_null()).then_some(Self { ptr, context: None })
+    }
+
+    pub(crate) const fn as_ptr(&self) -> *mut c_void {
+        self.ptr
+    }
+
+    pub(crate) fn is_active(&self) -> bool {
+        self.context
+            .as_ref()
+            .is_some_and(CallbackContext::is_active)
+    }
+}
+
+impl<T: Send + 'static> Drop for DelegateObject<T> {
+    fn drop(&mut self) {
+        if let Some(context) = &self.context {
+            context.deactivate();
+        }
+        if !self.ptr.is_null() {
+            unsafe { crate::ffi::scn_release(self.ptr) };
+            self.ptr = core::ptr::null_mut();
+        }
+    }
+}
+
+impl<T: Send + 'static> core::fmt::Debug for DelegateObject<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("DelegateObject")
+            .field("ptr", &self.ptr)
+            .field("owns_callbacks", &self.context.is_some())
+            .field("active", &self.is_active())
+            .finish()
+    }
+}
+
+pub fn is_main_thread() -> bool {
+    unsafe { libc::pthread_main_np() != 0 }
+}
 
 macro_rules! handle_type {
     (@emit $name:ident, $type_doc:expr, $ptr_doc:expr) => {
@@ -83,35 +206,6 @@ macro_rules! handle_type {
 }
 
 pub(crate) use handle_type;
-
-/// Generate a `Drop` impl for a release-only pointer wrapper.
-///
-/// Many delegate wrappers hold a single `*mut c_void` pointer to a retained
-/// Swift object and hand-roll an identical `Drop` that null-checks the pointer,
-/// calls `scn_release`, and clears the field. `scn_retained!` consolidates that
-/// boilerplate into a single audited place while preserving the exact behavior
-/// of the previous hand-written versions:
-/// - `Drop` null-checks `self.<field>` before calling the supplied `release`
-///   FFI fn (matching the original `if !ptr.is_null()` guards), then resets the
-///   field to a null pointer.
-///
-/// Wrappers whose `Drop` carries extra logic beyond release + null-check are
-/// intentionally left hand-written.
-macro_rules! scn_retained {
-    // Named-field struct (`{ ptr, .. }`), Drop only.
-    ($ty:ty, field = $field:ident, release = $release:path $(,)?) => {
-        impl Drop for $ty {
-            fn drop(&mut self) {
-                if !self.$field.is_null() {
-                    unsafe { $release(self.$field) };
-                    self.$field = core::ptr::null_mut();
-                }
-            }
-        }
-    };
-}
-
-pub(crate) use scn_retained;
 
 /// Builds a `CString` for SceneKit bridge calls.
 pub fn cstring_from_str(value: &str) -> Option<CString> {

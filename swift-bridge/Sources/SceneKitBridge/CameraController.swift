@@ -10,15 +10,17 @@ private func scnBorrowCameraControlConfiguration(
     return object as? (NSObjectProtocol & SCNCameraControlConfiguration)
 }
 
+private var cameraControllerDelegateKey: UInt8 = 0
+
 private final class CameraControllerDelegateBox: NSObject, SCNCameraControllerDelegate {
-    let context: UnsafeMutableRawPointer?
-    let releaseContext: ScnReleaseContextCallback?
+    let context: UnsafeMutableRawPointer
+    let releaseContext: ScnReleaseContextCallback
     let inertiaWillStart: CameraControllerCallback
     let inertiaDidEnd: CameraControllerCallback
 
     init(
-        context: UnsafeMutableRawPointer?,
-        releaseContext: ScnReleaseContextCallback?,
+        context: UnsafeMutableRawPointer,
+        releaseContext: @escaping ScnReleaseContextCallback,
         inertiaWillStart: @escaping CameraControllerCallback,
         inertiaDidEnd: @escaping CameraControllerCallback
     ) {
@@ -29,7 +31,7 @@ private final class CameraControllerDelegateBox: NSObject, SCNCameraControllerDe
     }
 
     deinit {
-        releaseContext?(context)
+        releaseContext(context)
     }
 
     func cameraInertiaWillStart(for cameraController: SCNCameraController) {
@@ -39,24 +41,17 @@ private final class CameraControllerDelegateBox: NSObject, SCNCameraControllerDe
     func cameraInertiaDidEnd(for cameraController: SCNCameraController) {
         inertiaDidEnd(context)
     }
-
-    func invokeInertiaWillStart() {
-        inertiaWillStart(context)
-    }
-
-    func invokeInertiaDidEnd() {
-        inertiaDidEnd(context)
-    }
 }
 
 @_cdecl("scn_camera_controller_delegate_new")
 public func scn_camera_controller_delegate_new(
     _ context: UnsafeMutableRawPointer?,
-    _ releaseContext: ScnReleaseContextCallback?,
+    _ releaseContext: @escaping ScnReleaseContextCallback,
     _ inertiaWillStart: @escaping CameraControllerCallback,
     _ inertiaDidEnd: @escaping CameraControllerCallback
 ) -> UnsafeMutableRawPointer? {
-    scnRetain(CameraControllerDelegateBox(
+    guard let context else { return nil }
+    return scnRetain(CameraControllerDelegateBox(
         context: context,
         releaseContext: releaseContext,
         inertiaWillStart: inertiaWillStart,
@@ -64,9 +59,14 @@ public func scn_camera_controller_delegate_new(
     ))
 }
 
+@_cdecl("scn_camera_controller_new")
+public func scn_camera_controller_new() -> UnsafeMutableRawPointer? {
+    scnRetain(SCNCameraController())
+}
+
 @_cdecl("scn_view_camera_control_configuration")
 public func scn_view_camera_control_configuration(_ viewHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let view: SCNView = scnBorrow(viewHandle) else { return nil }
+    guard let view = scnBorrowView(viewHandle) else { return nil }
     return scnRetain(view.cameraControlConfiguration as AnyObject)
 }
 
@@ -151,7 +151,16 @@ public func scn_camera_control_configuration_set_rotation_sensitivity(_ configur
 @_cdecl("scn_camera_controller_set_delegate")
 public func scn_camera_controller_set_delegate(_ controllerHandle: UnsafeMutableRawPointer?, _ delegateHandle: UnsafeMutableRawPointer?) {
     guard let controller: SCNCameraController = scnBorrow(controllerHandle) else { return }
-    controller.delegate = scnBorrow(delegateHandle)
+    let delegate: CameraControllerDelegateBox? = scnBorrow(delegateHandle)
+    scnRetainDelegate(delegate, by: controller, key: &cameraControllerDelegateKey) {
+        controller.delegate = delegate
+    }
+}
+
+@_cdecl("scn_camera_controller_get_delegate")
+public func scn_camera_controller_get_delegate(_ controllerHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    guard let controller: SCNCameraController = scnBorrow(controllerHandle) else { return nil }
+    return scnRetainedDelegate(of: controller, key: &cameraControllerDelegateKey)
 }
 
 @_cdecl("scn_camera_controller_get_point_of_view")
@@ -382,16 +391,12 @@ public func scn_camera_controller_end_interaction(_ controllerHandle: UnsafeMuta
 
 @_cdecl("scn_camera_controller_test_invoke_delegate_inertia_will_start")
 public func scn_camera_controller_test_invoke_delegate_inertia_will_start(_ controllerHandle: UnsafeMutableRawPointer?) {
-    guard let controller: SCNCameraController = scnBorrow(controllerHandle),
-          let delegate = controller.delegate as? CameraControllerDelegateBox
-    else { return }
-    delegate.invokeInertiaWillStart()
+    guard let controller: SCNCameraController = scnBorrow(controllerHandle), let delegate = controller.delegate else { return }
+    delegate.cameraInertiaWillStart?(for: controller)
 }
 
 @_cdecl("scn_camera_controller_test_invoke_delegate_inertia_did_end")
 public func scn_camera_controller_test_invoke_delegate_inertia_did_end(_ controllerHandle: UnsafeMutableRawPointer?) {
-    guard let controller: SCNCameraController = scnBorrow(controllerHandle),
-          let delegate = controller.delegate as? CameraControllerDelegateBox
-    else { return }
-    delegate.invokeInertiaDidEnd()
+    guard let controller: SCNCameraController = scnBorrow(controllerHandle), let delegate = controller.delegate else { return }
+    delegate.cameraInertiaDidEnd?(for: controller)
 }

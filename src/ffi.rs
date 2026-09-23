@@ -2,14 +2,14 @@
 
 use core::ffi::{c_char, c_void};
 
-pub type ScnActionCallback = extern "C" fn(*mut c_void, *mut c_void, f64);
-pub type ScnDropCallback = extern "C" fn(*mut c_void);
-pub type ScnTimeCallback = extern "C" fn(*mut c_void, f64);
-pub type ScnSceneCallback = extern "C" fn(*mut c_void, *mut c_void, f64);
-pub type ScnVoidCallback = extern "C" fn(*mut c_void);
-pub type ScnContactCallback = extern "C" fn(*mut c_void, *mut c_void);
-pub type ScnProgramErrorCallback = extern "C" fn(*mut c_void, *mut c_char);
-pub type ScnProgramBufferBindingCallback = extern "C" fn(*mut c_void, *mut c_void);
+pub type ScnActionCallback = unsafe extern "C" fn(*mut c_void, *mut c_void, f64);
+pub type ScnDropCallback = unsafe extern "C" fn(*mut c_void);
+pub type ScnTimeCallback = unsafe extern "C" fn(*mut c_void, f64);
+pub type ScnSceneCallback = unsafe extern "C" fn(*mut c_void, *mut c_void, f64);
+pub type ScnVoidCallback = unsafe extern "C" fn(*mut c_void);
+pub type ScnContactCallback = unsafe extern "C" fn(*mut c_void, *mut c_void);
+pub type ScnProgramErrorCallback = unsafe extern "C" fn(*mut c_void, *mut c_char);
+pub type ScnProgramBufferBindingCallback = unsafe extern "C" fn(*mut c_void, *mut c_void);
 
 extern "C" {
     pub fn scn_release(handle: *mut c_void);
@@ -329,15 +329,6 @@ extern "C" {
     pub fn scn_scene_renderer_set_debug_options(renderer: *mut c_void, debug_options: usize);
     pub fn scn_scene_renderer_get_rendering_api(renderer: *mut c_void) -> i32;
     pub fn scn_scene_renderer_set_delegate(renderer: *mut c_void, delegate: *mut c_void);
-    pub fn scn_scene_renderer_test_invoke_delegate_update(renderer: *mut c_void, time: f64);
-    pub fn scn_scene_renderer_test_invoke_delegate_will_render_scene(
-        renderer: *mut c_void,
-        time: f64,
-    );
-    pub fn scn_scene_renderer_test_invoke_delegate_did_render_scene(
-        renderer: *mut c_void,
-        time: f64,
-    );
     pub fn scn_view_get_antialiasing_mode(view: *mut c_void) -> i32;
     pub fn scn_view_set_antialiasing_mode(view: *mut c_void, antialiasing_mode: i32);
 
@@ -389,7 +380,9 @@ extern "C" {
         configuration: *mut c_void,
         rotation_sensitivity: f64,
     );
+    pub fn scn_camera_controller_new() -> *mut c_void;
     pub fn scn_camera_controller_set_delegate(controller: *mut c_void, delegate: *mut c_void);
+    pub fn scn_camera_controller_get_delegate(controller: *mut c_void) -> *mut c_void;
     pub fn scn_camera_controller_get_point_of_view(controller: *mut c_void) -> *mut c_void;
     pub fn scn_camera_controller_set_point_of_view(
         controller: *mut c_void,
@@ -502,8 +495,6 @@ extern "C" {
         velocity_x: f64,
         velocity_y: f64,
     );
-    pub fn scn_camera_controller_test_invoke_delegate_inertia_will_start(controller: *mut c_void);
-    pub fn scn_camera_controller_test_invoke_delegate_inertia_did_end(controller: *mut c_void);
 
     pub fn scn_scene_source_new_url(
         path: *const c_char,
@@ -579,6 +570,7 @@ extern "C" {
         symbol: *const c_char,
     ) -> *mut c_char;
     pub fn scn_program_set_delegate(program: *mut c_void, delegate: *mut c_void);
+    pub fn scn_program_get_delegate(program: *mut c_void) -> *mut c_void;
     pub fn scn_program_set_buffer_binding(
         program: *mut c_void,
         name: *const c_char,
@@ -612,14 +604,6 @@ extern "C" {
         bytes: *const c_void,
         length: usize,
     );
-    pub fn scn_program_test_invoke_delegate_handle_error(
-        program: *mut c_void,
-        message: *const c_char,
-    );
-    pub fn scn_program_test_invoke_buffer_binding(
-        program: *mut c_void,
-        name: *const c_char,
-    ) -> isize;
 
     pub fn scn_scene_physics_world(scene: *mut c_void) -> *mut c_void;
     pub fn scn_physics_contact_delegate_new(
@@ -659,7 +643,4 @@ extern "C" {
     pub fn scn_physics_contact_get_collision_impulse(contact: *mut c_void) -> f64;
     pub fn scn_physics_contact_get_penetration_distance(contact: *mut c_void) -> f64;
     pub fn scn_physics_contact_get_sweep_test_fraction(contact: *mut c_void) -> f64;
-    pub fn scn_physics_world_test_invoke_delegate_did_begin(world: *mut c_void);
-    pub fn scn_physics_world_test_invoke_delegate_did_update(world: *mut c_void);
-    pub fn scn_physics_world_test_invoke_delegate_did_end(world: *mut c_void);
 }

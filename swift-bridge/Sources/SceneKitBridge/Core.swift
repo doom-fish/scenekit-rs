@@ -3,6 +3,7 @@ import CoreGraphics
 import Foundation
 import Metal
 import ModelIO
+import ObjectiveC
 import QuartzCore
 import SceneKit
 
@@ -23,6 +24,23 @@ func scnReleaseHandle(_ handle: UnsafeMutableRawPointer?) {
 func scnBorrow<T>(_ handle: UnsafeMutableRawPointer?) -> T? {
     guard let handle else { return nil }
     return Unmanaged<AnyObject>.fromOpaque(handle).takeUnretainedValue() as? T
+}
+
+func scnRetainDelegate(_ delegate: AnyObject?, by owner: AnyObject, key: UnsafeRawPointer, assign: () -> Void) {
+    let previous = objc_getAssociatedObject(owner, key)
+    objc_setAssociatedObject(owner, key, delegate, .OBJC_ASSOCIATION_RETAIN)
+    assign()
+    withExtendedLifetime(previous) {}
+}
+
+func scnRetainedDelegate(of owner: AnyObject, key: UnsafeRawPointer) -> UnsafeMutableRawPointer? {
+    guard let delegate = objc_getAssociatedObject(owner, key) as AnyObject? else { return nil }
+    return scnRetain(delegate)
+}
+
+func scnBorrowView(_ handle: UnsafeMutableRawPointer?) -> SCNView? {
+    guard Thread.isMainThread else { return nil }
+    return scnBorrow(handle)
 }
 
 @inline(__always)

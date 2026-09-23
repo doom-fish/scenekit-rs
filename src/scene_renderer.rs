@@ -2,14 +2,13 @@ use apple_cf::cg::CGColorSpace;
 use core::ffi::c_void;
 use core::ptr;
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign};
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::ffi;
 use crate::geometry::Geometry;
 use crate::hit_test::HitTestResults;
 use crate::material::Material;
 use crate::node::Node;
-use crate::private::{handle_type, Sealed};
+use crate::private::{handle_type, invoke_callback, CallbackState, DelegateObject, Sealed};
 use crate::renderer::{RenderPassDescriptor, Renderer};
 use crate::scene::Scene;
 use crate::spritekit::{SpriteScene, SpriteTransition};
@@ -260,8 +259,8 @@ impl Prepareable for Material {
     }
 }
 
-type TimeCallback = Box<dyn FnMut(f64)>;
-type SceneCallback = Box<dyn FnMut(&Scene, f64)>;
+type TimeCallback = Box<dyn FnMut(f64) + Send>;
+type SceneCallback = Box<dyn FnMut(&Scene, f64) + Send>;
 
 /// Stores Rust callbacks backing `SCNSceneRendererDelegate`.
 #[derive(Default)]
@@ -292,7 +291,7 @@ impl SceneRendererDelegateCallbacks {
     #[must_use]
     pub fn on_update<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(f64) + 'static,
+        F: FnMut(f64) + Send + 'static,
     {
         self.update = Some(Box::new(callback));
         self
@@ -302,7 +301,7 @@ impl SceneRendererDelegateCallbacks {
     #[must_use]
     pub fn on_did_apply_animations<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(f64) + 'static,
+        F: FnMut(f64) + Send + 'static,
     {
         self.did_apply_animations = Some(Box::new(callback));
         self
@@ -312,7 +311,7 @@ impl SceneRendererDelegateCallbacks {
     #[must_use]
     pub fn on_did_simulate_physics<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(f64) + 'static,
+        F: FnMut(f64) + Send + 'static,
     {
         self.did_simulate_physics = Some(Box::new(callback));
         self
@@ -322,7 +321,7 @@ impl SceneRendererDelegateCallbacks {
     #[must_use]
     pub fn on_did_apply_constraints<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(f64) + 'static,
+        F: FnMut(f64) + Send + 'static,
     {
         self.did_apply_constraints = Some(Box::new(callback));
         self
@@ -332,7 +331,7 @@ impl SceneRendererDelegateCallbacks {
     #[must_use]
     pub fn on_will_render_scene<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&Scene, f64) + 'static,
+        F: FnMut(&Scene, f64) + Send + 'static,
     {
         self.will_render_scene = Some(Box::new(callback));
         self
@@ -342,143 +341,147 @@ impl SceneRendererDelegateCallbacks {
     #[must_use]
     pub fn on_did_render_scene<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&Scene, f64) + 'static,
+        F: FnMut(&Scene, f64) + Send + 'static,
     {
         self.did_render_scene = Some(Box::new(callback));
         self
     }
 }
 
-struct SceneRendererDelegateState {
-    callbacks: SceneRendererDelegateCallbacks,
-}
-
 /// Wraps `SCNSceneRendererDelegate`.
+#[derive(Debug)]
 pub struct SceneRendererDelegate {
-    ptr: *mut c_void,
+    inner: DelegateObject<SceneRendererDelegateCallbacks>,
 }
 
-impl core::fmt::Debug for SceneRendererDelegate {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("SceneRendererDelegate")
-            .field("ptr", &self.ptr)
-            .finish()
+unsafe fn invoke_time_callback(
+    context: *mut c_void,
+    site: &str,
+    time: f64,
+    select: impl FnOnce(&mut SceneRendererDelegateCallbacks) -> &mut Option<TimeCallback>,
+) {
+    unsafe {
+        invoke_callback::<SceneRendererDelegateCallbacks, _>(context, site, |callbacks| {
+            if let Some(callback) = select(callbacks).as_mut() {
+                callback(time);
+            }
+        });
     }
 }
 
-crate::private::scn_retained!(
-    SceneRendererDelegate,
-    field = ptr,
-    release = ffi::scn_release
-);
-
-unsafe fn delegate_state_from_context<'a>(
+unsafe fn invoke_scene_callback(
     context: *mut c_void,
-) -> &'a mut SceneRendererDelegateState {
-    &mut *context.cast::<SceneRendererDelegateState>()
-}
-
-extern "C" fn release_scene_renderer_delegate_context(context: *mut c_void) {
-    if context.is_null() {
+    site: &str,
+    scene: *mut c_void,
+    time: f64,
+    select: impl FnOnce(&mut SceneRendererDelegateCallbacks) -> &mut Option<SceneCallback>,
+) {
+    if scene.is_null() {
         return;
     }
+    let scene = unsafe { Scene::from_raw_borrowed(scene) };
     unsafe {
-        drop(Box::from_raw(context.cast::<SceneRendererDelegateState>()));
+        invoke_callback::<SceneRendererDelegateCallbacks, _>(context, site, |callbacks| {
+            if let Some(callback) = select(callbacks).as_mut() {
+                callback(&scene, time);
+            }
+        });
     }
 }
 
-extern "C" fn scene_renderer_update_trampoline(context: *mut c_void, time: f64) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() {
-            return;
-        }
-        let state = unsafe { delegate_state_from_context(context) };
-        if let Some(callback) = state.callbacks.update.as_mut() {
-            callback(time);
-        }
-    }));
+unsafe extern "C" fn scene_renderer_update_trampoline(context: *mut c_void, time: f64) {
+    unsafe {
+        invoke_time_callback(
+            context,
+            "scenekit::SceneRendererDelegate::update",
+            time,
+            |callbacks| &mut callbacks.update,
+        );
+    }
 }
 
-extern "C" fn scene_renderer_did_apply_animations_trampoline(context: *mut c_void, time: f64) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() {
-            return;
-        }
-        let state = unsafe { delegate_state_from_context(context) };
-        if let Some(callback) = state.callbacks.did_apply_animations.as_mut() {
-            callback(time);
-        }
-    }));
+unsafe extern "C" fn scene_renderer_did_apply_animations_trampoline(
+    context: *mut c_void,
+    time: f64,
+) {
+    unsafe {
+        invoke_time_callback(
+            context,
+            "scenekit::SceneRendererDelegate::did_apply_animations",
+            time,
+            |callbacks| &mut callbacks.did_apply_animations,
+        );
+    }
 }
 
-extern "C" fn scene_renderer_did_simulate_physics_trampoline(context: *mut c_void, time: f64) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() {
-            return;
-        }
-        let state = unsafe { delegate_state_from_context(context) };
-        if let Some(callback) = state.callbacks.did_simulate_physics.as_mut() {
-            callback(time);
-        }
-    }));
+unsafe extern "C" fn scene_renderer_did_simulate_physics_trampoline(
+    context: *mut c_void,
+    time: f64,
+) {
+    unsafe {
+        invoke_time_callback(
+            context,
+            "scenekit::SceneRendererDelegate::did_simulate_physics",
+            time,
+            |callbacks| &mut callbacks.did_simulate_physics,
+        );
+    }
 }
 
-extern "C" fn scene_renderer_did_apply_constraints_trampoline(context: *mut c_void, time: f64) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() {
-            return;
-        }
-        let state = unsafe { delegate_state_from_context(context) };
-        if let Some(callback) = state.callbacks.did_apply_constraints.as_mut() {
-            callback(time);
-        }
-    }));
+unsafe extern "C" fn scene_renderer_did_apply_constraints_trampoline(
+    context: *mut c_void,
+    time: f64,
+) {
+    unsafe {
+        invoke_time_callback(
+            context,
+            "scenekit::SceneRendererDelegate::did_apply_constraints",
+            time,
+            |callbacks| &mut callbacks.did_apply_constraints,
+        );
+    }
 }
 
-extern "C" fn scene_renderer_will_render_scene_trampoline(
+unsafe extern "C" fn scene_renderer_will_render_scene_trampoline(
     context: *mut c_void,
     scene: *mut c_void,
     time: f64,
 ) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() || scene.is_null() {
-            return;
-        }
-        let state = unsafe { delegate_state_from_context(context) };
-        if let Some(callback) = state.callbacks.will_render_scene.as_mut() {
-            let scene = unsafe { Scene::from_raw_borrowed(scene) };
-            callback(&scene, time);
-        }
-    }));
+    unsafe {
+        invoke_scene_callback(
+            context,
+            "scenekit::SceneRendererDelegate::will_render_scene",
+            scene,
+            time,
+            |callbacks| &mut callbacks.will_render_scene,
+        );
+    }
 }
 
-extern "C" fn scene_renderer_did_render_scene_trampoline(
+unsafe extern "C" fn scene_renderer_did_render_scene_trampoline(
     context: *mut c_void,
     scene: *mut c_void,
     time: f64,
 ) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() || scene.is_null() {
-            return;
-        }
-        let state = unsafe { delegate_state_from_context(context) };
-        if let Some(callback) = state.callbacks.did_render_scene.as_mut() {
-            let scene = unsafe { Scene::from_raw_borrowed(scene) };
-            callback(&scene, time);
-        }
-    }));
+    unsafe {
+        invoke_scene_callback(
+            context,
+            "scenekit::SceneRendererDelegate::did_render_scene",
+            scene,
+            time,
+            |callbacks| &mut callbacks.did_render_scene,
+        );
+    }
 }
 
 impl SceneRendererDelegate {
     /// Creates a wrapped `SCNSceneRendererDelegate` instance.
     #[must_use]
     pub fn new(callbacks: SceneRendererDelegateCallbacks) -> Option<Self> {
-        let state = Box::new(SceneRendererDelegateState { callbacks });
-        let context = Box::into_raw(state).cast::<c_void>();
-        let ptr = unsafe {
+        DelegateObject::new(callbacks, |context| unsafe {
             ffi::scn_scene_renderer_delegate_new(
                 context,
-                release_scene_renderer_delegate_context,
+                CallbackState::<SceneRendererDelegateCallbacks>::RELEASE,
                 scene_renderer_update_trampoline,
                 scene_renderer_did_apply_animations_trampoline,
                 scene_renderer_did_simulate_physics_trampoline,
@@ -486,19 +489,14 @@ impl SceneRendererDelegate {
                 scene_renderer_will_render_scene_trampoline,
                 scene_renderer_did_render_scene_trampoline,
             )
-        };
-        if ptr.is_null() {
-            release_scene_renderer_delegate_context(context);
-            None
-        } else {
-            Some(Self { ptr })
-        }
+        })
+        .map(|inner| Self { inner })
     }
 
     /// Returns the Objective-C pointer backing this `SCNSceneRendererDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
-        self.ptr
+        self.inner.as_ptr()
     }
 }
 
@@ -756,12 +754,10 @@ pub trait SceneRenderer: Sealed {
     /// Mirrors the `SCNSceneRenderer.delegate` protocol requirement.
     #[must_use]
     fn delegate(&self) -> Option<SceneRendererDelegate> {
-        unsafe {
-            Some(SceneRendererDelegate {
-                ptr: scn_scene_renderer_get_delegate(self.scene_renderer_ptr()),
-            })
-            .filter(|delegate| !delegate.ptr.is_null())
-        }
+        DelegateObject::from_retained(unsafe {
+            scn_scene_renderer_get_delegate(self.scene_renderer_ptr())
+        })
+        .map(|inner| SceneRendererDelegate { inner })
     }
 
     /// Mirrors the `SCNSceneRenderer.prepareObject` protocol requirement.

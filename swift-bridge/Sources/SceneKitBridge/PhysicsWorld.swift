@@ -3,15 +3,15 @@ import SceneKit
 public typealias PhysicsContactCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
 
 private final class PhysicsContactDelegateBox: NSObject, SCNPhysicsContactDelegate {
-    let context: UnsafeMutableRawPointer?
-    let releaseContext: ScnReleaseContextCallback?
+    let context: UnsafeMutableRawPointer
+    let releaseContext: ScnReleaseContextCallback
     let didBeginContact: PhysicsContactCallback
     let didUpdateContact: PhysicsContactCallback
     let didEndContact: PhysicsContactCallback
 
     init(
-        context: UnsafeMutableRawPointer?,
-        releaseContext: ScnReleaseContextCallback?,
+        context: UnsafeMutableRawPointer,
+        releaseContext: @escaping ScnReleaseContextCallback,
         didBeginContact: @escaping PhysicsContactCallback,
         didUpdateContact: @escaping PhysicsContactCallback,
         didEndContact: @escaping PhysicsContactCallback
@@ -24,7 +24,7 @@ private final class PhysicsContactDelegateBox: NSObject, SCNPhysicsContactDelega
     }
 
     deinit {
-        releaseContext?(context)
+        releaseContext(context)
     }
 
     func physicsWorld(_ world: SCNPhysicsWorld, didBegin contact: SCNPhysicsContact) {
@@ -55,12 +55,13 @@ private final class PhysicsContactDelegateBox: NSObject, SCNPhysicsContactDelega
 @_cdecl("scn_physics_contact_delegate_new")
 public func scn_physics_contact_delegate_new(
     _ context: UnsafeMutableRawPointer?,
-    _ releaseContext: ScnReleaseContextCallback?,
+    _ releaseContext: @escaping ScnReleaseContextCallback,
     _ didBeginContact: @escaping PhysicsContactCallback,
     _ didUpdateContact: @escaping PhysicsContactCallback,
     _ didEndContact: @escaping PhysicsContactCallback
 ) -> UnsafeMutableRawPointer? {
-    scnRetain(PhysicsContactDelegateBox(
+    guard let context else { return nil }
+    return scnRetain(PhysicsContactDelegateBox(
         context: context,
         releaseContext: releaseContext,
         didBeginContact: didBeginContact,

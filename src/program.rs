@@ -1,12 +1,14 @@
 use core::ffi::{c_char, c_void};
 use core::ptr;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::error::{take_string, SceneKitError};
 use crate::ffi;
 use crate::geometry::Geometry;
 use crate::material::Material;
-use crate::private::{cstring_from_str, handle_type, lookup_string_constant, Sealed};
+use crate::private::{
+    cstring_from_str, handle_type, invoke_callback, lookup_string_constant, CallbackState,
+    DelegateObject, Sealed,
+};
 
 handle_type!(BufferStream);
 handle_type!(Program);
@@ -64,107 +66,51 @@ string_constant_fn!(
     "SCNShaderModifierEntryPointSurface"
 );
 
-type ProgramErrorCallback = Box<dyn FnMut(SceneKitError)>;
-type BufferBindingCallback = Box<dyn FnMut(&BufferStream)>;
-
-struct ProgramDelegateState {
-    handle_error: ProgramErrorCallback,
-}
-
-struct ProgramBufferBindingState {
-    callback: BufferBindingCallback,
-}
+type ProgramErrorCallback = Box<dyn FnMut(SceneKitError) + Send>;
+type BufferBindingCallback = Box<dyn FnMut(&BufferStream) + Send>;
 
 /// Wraps `SCNProgramDelegate`.
+#[derive(Debug)]
 pub struct ProgramDelegate {
-    ptr: *mut c_void,
+    inner: DelegateObject<ProgramErrorCallback>,
 }
 
 /// Wraps `SCNBufferBindingBlock`.
+#[derive(Debug)]
 pub struct ProgramBufferBinding {
-    ptr: *mut c_void,
+    inner: DelegateObject<BufferBindingCallback>,
 }
 
-impl core::fmt::Debug for ProgramDelegate {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("ProgramDelegate")
-            .field("ptr", &self.ptr)
-            .finish()
+unsafe extern "C" fn program_delegate_handle_error_trampoline(
+    context: *mut c_void,
+    message: *mut c_char,
+) {
+    let message = unsafe { take_string(message) }
+        .unwrap_or_else(|| "SCNProgramDelegate.handleError invoked without a message".to_owned());
+    unsafe {
+        invoke_callback::<ProgramErrorCallback, _>(
+            context,
+            "scenekit::ProgramDelegate::handle_error",
+            |callback| callback(SceneKitError::new(message)),
+        );
     }
 }
 
-impl core::fmt::Debug for ProgramBufferBinding {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("ProgramBufferBinding")
-            .field("ptr", &self.ptr)
-            .finish()
-    }
-}
-
-crate::private::scn_retained!(ProgramDelegate, field = ptr, release = ffi::scn_release);
-
-crate::private::scn_retained!(
-    ProgramBufferBinding,
-    field = ptr,
-    release = ffi::scn_release
-);
-
-unsafe fn program_delegate_state_from_context<'a>(
+unsafe extern "C" fn program_buffer_binding_trampoline(
     context: *mut c_void,
-) -> &'a mut ProgramDelegateState {
-    &mut *context.cast::<ProgramDelegateState>()
-}
-
-unsafe fn program_buffer_binding_state_from_context<'a>(
-    context: *mut c_void,
-) -> &'a mut ProgramBufferBindingState {
-    &mut *context.cast::<ProgramBufferBindingState>()
-}
-
-extern "C" fn release_program_delegate_context(context: *mut c_void) {
-    if context.is_null() {
+    buffer_stream: *mut c_void,
+) {
+    if buffer_stream.is_null() {
         return;
     }
+    let buffer_stream = unsafe { BufferStream::from_raw_borrowed(buffer_stream) };
     unsafe {
-        drop(Box::from_raw(context.cast::<ProgramDelegateState>()));
+        invoke_callback::<BufferBindingCallback, _>(
+            context,
+            "scenekit::ProgramBufferBinding::bind",
+            |callback| callback(&buffer_stream),
+        );
     }
-}
-
-extern "C" fn release_program_buffer_binding_context(context: *mut c_void) {
-    if context.is_null() {
-        return;
-    }
-    unsafe {
-        drop(Box::from_raw(context.cast::<ProgramBufferBindingState>()));
-    }
-}
-
-extern "C" fn program_delegate_handle_error_trampoline(context: *mut c_void, message: *mut c_char) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() {
-            if !message.is_null() {
-                let _ = unsafe { take_string(message) };
-            }
-            return;
-        }
-
-        let state = unsafe { program_delegate_state_from_context(context) };
-        let message = unsafe { take_string(message) }.unwrap_or_else(|| {
-            "SCNProgramDelegate.handleError invoked without a message".to_owned()
-        });
-        (state.handle_error)(SceneKitError::new(message));
-    }));
-}
-
-extern "C" fn program_buffer_binding_trampoline(context: *mut c_void, buffer_stream: *mut c_void) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() || buffer_stream.is_null() {
-            return;
-        }
-        let state = unsafe { program_buffer_binding_state_from_context(context) };
-        let buffer_stream = unsafe { BufferStream::from_raw_borrowed(buffer_stream) };
-        (state.callback)(&buffer_stream);
-    }));
 }
 
 impl ProgramDelegate {
@@ -172,31 +118,23 @@ impl ProgramDelegate {
     #[must_use]
     pub fn new<F>(callback: F) -> Option<Self>
     where
-        F: FnMut(SceneKitError) + 'static,
+        F: FnMut(SceneKitError) + Send + 'static,
     {
-        let state = Box::new(ProgramDelegateState {
-            handle_error: Box::new(callback),
-        });
-        let context = Box::into_raw(state).cast::<c_void>();
-        let ptr = unsafe {
+        let callback: ProgramErrorCallback = Box::new(callback);
+        DelegateObject::new(callback, |context| unsafe {
             ffi::scn_program_delegate_new(
                 context,
-                release_program_delegate_context,
+                CallbackState::<ProgramErrorCallback>::RELEASE,
                 program_delegate_handle_error_trampoline,
             )
-        };
-        if ptr.is_null() {
-            release_program_delegate_context(context);
-            None
-        } else {
-            Some(Self { ptr })
-        }
+        })
+        .map(|inner| Self { inner })
     }
 
     /// Returns the Objective-C pointer backing this `SCNProgramDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
-        self.ptr
+        self.inner.as_ptr()
     }
 }
 
@@ -205,31 +143,23 @@ impl ProgramBufferBinding {
     #[must_use]
     pub fn new<F>(callback: F) -> Option<Self>
     where
-        F: FnMut(&BufferStream) + 'static,
+        F: FnMut(&BufferStream) + Send + 'static,
     {
-        let state = Box::new(ProgramBufferBindingState {
-            callback: Box::new(callback),
-        });
-        let context = Box::into_raw(state).cast::<c_void>();
-        let ptr = unsafe {
+        let callback: BufferBindingCallback = Box::new(callback);
+        DelegateObject::new(callback, |context| unsafe {
             ffi::scn_program_buffer_binding_new(
                 context,
-                release_program_buffer_binding_context,
+                CallbackState::<BufferBindingCallback>::RELEASE,
                 program_buffer_binding_trampoline,
             )
-        };
-        if ptr.is_null() {
-            release_program_buffer_binding_context(context);
-            None
-        } else {
-            Some(Self { ptr })
-        }
+        })
+        .map(|inner| Self { inner })
     }
 
     /// Returns the Objective-C pointer backing this `SCNBufferBindingBlock` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
-        self.ptr
+        self.inner.as_ptr()
     }
 }
 
@@ -546,6 +476,12 @@ impl Program {
                 delegate.map_or(ptr::null_mut(), ProgramDelegate::as_ptr),
             );
         };
+    }
+
+    #[must_use]
+    pub fn delegate(&self) -> Option<ProgramDelegate> {
+        DelegateObject::from_retained(unsafe { ffi::scn_program_get_delegate(self.ptr) })
+            .map(|inner| ProgramDelegate { inner })
     }
 
     /// Sets the `SCNProgram.bufferBinding` member.

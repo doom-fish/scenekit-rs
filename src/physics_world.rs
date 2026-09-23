@@ -1,12 +1,13 @@
 use core::ffi::c_void;
 use core::ptr;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::ffi;
 use crate::math::Vector3;
 use crate::node::Node;
 use crate::physics::PhysicsBody;
-use crate::private::{handle_type, lookup_string_constant};
+use crate::private::{
+    handle_type, invoke_callback, lookup_string_constant, CallbackState, DelegateObject,
+};
 use crate::scene::Scene;
 
 handle_type!(PhysicsContact);
@@ -38,7 +39,7 @@ string_constant_fn!(
 );
 string_constant_fn!(physics_test_search_mode_key, "SCNPhysicsTestSearchModeKey");
 
-type PhysicsContactCallback = Box<dyn FnMut(Option<&PhysicsContact>)>;
+type PhysicsContactCallback = Box<dyn FnMut(Option<&PhysicsContact>) + Send>;
 
 /// Stores Rust callbacks backing `SCNPhysicsContactDelegate`.
 #[derive(Default)]
@@ -63,7 +64,7 @@ impl PhysicsContactDelegateCallbacks {
     #[must_use]
     pub fn on_did_begin_contact<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(Option<&PhysicsContact>) + 'static,
+        F: FnMut(Option<&PhysicsContact>) + Send + 'static,
     {
         self.begin = Some(Box::new(callback));
         self
@@ -73,7 +74,7 @@ impl PhysicsContactDelegateCallbacks {
     #[must_use]
     pub fn on_did_update_contact<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(Option<&PhysicsContact>) + 'static,
+        F: FnMut(Option<&PhysicsContact>) + Send + 'static,
     {
         self.update = Some(Box::new(callback));
         self
@@ -83,116 +84,98 @@ impl PhysicsContactDelegateCallbacks {
     #[must_use]
     pub fn on_did_end_contact<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(Option<&PhysicsContact>) + 'static,
+        F: FnMut(Option<&PhysicsContact>) + Send + 'static,
     {
         self.end = Some(Box::new(callback));
         self
     }
 }
 
-struct PhysicsContactDelegateState {
-    callbacks: PhysicsContactDelegateCallbacks,
-}
-
 /// Wraps `SCNPhysicsContactDelegate`.
+#[derive(Debug)]
 pub struct PhysicsContactDelegate {
-    ptr: *mut c_void,
-}
-
-impl core::fmt::Debug for PhysicsContactDelegate {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("PhysicsContactDelegate")
-            .field("ptr", &self.ptr)
-            .finish()
-    }
-}
-
-crate::private::scn_retained!(
-    PhysicsContactDelegate,
-    field = ptr,
-    release = ffi::scn_release
-);
-
-unsafe fn physics_delegate_state_from_context<'a>(
-    context: *mut c_void,
-) -> &'a mut PhysicsContactDelegateState {
-    &mut *context.cast::<PhysicsContactDelegateState>()
-}
-
-extern "C" fn release_physics_delegate_context(context: *mut c_void) {
-    if context.is_null() {
-        return;
-    }
-    unsafe {
-        drop(Box::from_raw(context.cast::<PhysicsContactDelegateState>()));
-    }
+    inner: DelegateObject<PhysicsContactDelegateCallbacks>,
 }
 
 unsafe fn with_contact_callback(
     context: *mut c_void,
+    site: &str,
     contact: *mut c_void,
     select: impl FnOnce(&mut PhysicsContactDelegateCallbacks) -> &mut Option<PhysicsContactCallback>,
 ) {
-    if context.is_null() {
-        return;
-    }
-    let state = unsafe { physics_delegate_state_from_context(context) };
-    let callback_slot = select(&mut state.callbacks);
-    if let Some(callback) = callback_slot.as_mut() {
-        if contact.is_null() {
-            callback(None);
-        } else {
-            let contact = unsafe { PhysicsContact::from_raw_borrowed(contact) };
-            callback(Some(&contact));
-        }
+    let contact =
+        (!contact.is_null()).then(|| unsafe { PhysicsContact::from_raw_borrowed(contact) });
+    unsafe {
+        invoke_callback::<PhysicsContactDelegateCallbacks, _>(context, site, |callbacks| {
+            if let Some(callback) = select(callbacks).as_mut() {
+                callback(contact.as_ref());
+            }
+        });
     }
 }
 
-extern "C" fn physics_did_begin_contact_trampoline(context: *mut c_void, contact: *mut c_void) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        unsafe { with_contact_callback(context, contact, |callbacks| &mut callbacks.begin) };
-    }));
+unsafe extern "C" fn physics_did_begin_contact_trampoline(
+    context: *mut c_void,
+    contact: *mut c_void,
+) {
+    unsafe {
+        with_contact_callback(
+            context,
+            "scenekit::PhysicsContactDelegate::did_begin_contact",
+            contact,
+            |callbacks| &mut callbacks.begin,
+        );
+    }
 }
 
-extern "C" fn physics_did_update_contact_trampoline(context: *mut c_void, contact: *mut c_void) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        unsafe { with_contact_callback(context, contact, |callbacks| &mut callbacks.update) };
-    }));
+unsafe extern "C" fn physics_did_update_contact_trampoline(
+    context: *mut c_void,
+    contact: *mut c_void,
+) {
+    unsafe {
+        with_contact_callback(
+            context,
+            "scenekit::PhysicsContactDelegate::did_update_contact",
+            contact,
+            |callbacks| &mut callbacks.update,
+        );
+    }
 }
 
-extern "C" fn physics_did_end_contact_trampoline(context: *mut c_void, contact: *mut c_void) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        unsafe { with_contact_callback(context, contact, |callbacks| &mut callbacks.end) };
-    }));
+unsafe extern "C" fn physics_did_end_contact_trampoline(
+    context: *mut c_void,
+    contact: *mut c_void,
+) {
+    unsafe {
+        with_contact_callback(
+            context,
+            "scenekit::PhysicsContactDelegate::did_end_contact",
+            contact,
+            |callbacks| &mut callbacks.end,
+        );
+    }
 }
 
 impl PhysicsContactDelegate {
     /// Creates a wrapped `SCNPhysicsContactDelegate` instance.
     #[must_use]
     pub fn new(callbacks: PhysicsContactDelegateCallbacks) -> Option<Self> {
-        let state = Box::new(PhysicsContactDelegateState { callbacks });
-        let context = Box::into_raw(state).cast::<c_void>();
-        let ptr = unsafe {
+        DelegateObject::new(callbacks, |context| unsafe {
             ffi::scn_physics_contact_delegate_new(
                 context,
-                release_physics_delegate_context,
+                CallbackState::<PhysicsContactDelegateCallbacks>::RELEASE,
                 physics_did_begin_contact_trampoline,
                 physics_did_update_contact_trampoline,
                 physics_did_end_contact_trampoline,
             )
-        };
-        if ptr.is_null() {
-            release_physics_delegate_context(context);
-            None
-        } else {
-            Some(Self { ptr })
-        }
+        })
+        .map(|inner| Self { inner })
     }
 
     /// Returns the Objective-C pointer backing this `SCNPhysicsContactDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
-        self.ptr
+        self.inner.as_ptr()
     }
 }
 

@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_void};
+use core::mem::ManuallyDrop;
 use core::ptr;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::action::Action;
 use crate::animation::{Animation, AnimationPlayer};
@@ -13,7 +13,9 @@ use crate::material::{Material, MaterialProperty};
 use crate::math::Vector3;
 use crate::node::Node;
 use crate::particle_system::ParticleSystem;
-use crate::private::{cstring_from_str, handle_type, Sealed};
+use crate::private::{
+    cstring_from_str, handle_type, invoke_callback, CallbackCell, CallbackState, Sealed,
+};
 use crate::renderer::Renderer;
 use crate::technique::Technique;
 use crate::view::View;
@@ -71,8 +73,8 @@ extern "C" {
     fn scn_animation_event_new(
         key_time: f32,
         context: *mut c_void,
-        release_context: extern "C" fn(*mut c_void),
-        callback: extern "C" fn(*mut c_void, bool),
+        release_context: unsafe extern "C" fn(*mut c_void),
+        callback: unsafe extern "C" fn(*mut c_void, bool),
     ) -> *mut c_void;
 }
 
@@ -300,35 +302,16 @@ impl TimingFunction {
     }
 }
 
-type AnimationEventCallback = Box<dyn FnMut(bool)>;
+type AnimationEventCallback = Box<dyn FnMut(bool) + Send>;
 
-struct AnimationEventState {
-    callback: AnimationEventCallback,
-}
-
-unsafe fn animation_event_state_from_context<'a>(
-    context: *mut c_void,
-) -> &'a mut AnimationEventState {
-    &mut *context.cast::<AnimationEventState>()
-}
-
-extern "C" fn release_animation_event_context(context: *mut c_void) {
-    if context.is_null() {
-        return;
-    }
+unsafe extern "C" fn animation_event_trampoline(context: *mut c_void, playing_backward: bool) {
     unsafe {
-        drop(Box::from_raw(context.cast::<AnimationEventState>()));
+        invoke_callback::<AnimationEventCallback, _>(
+            context,
+            "scenekit::AnimationEvent",
+            |callback| callback(playing_backward),
+        );
     }
-}
-
-extern "C" fn animation_event_trampoline(context: *mut c_void, playing_backward: bool) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() {
-            return;
-        }
-        let state = unsafe { animation_event_state_from_context(context) };
-        (state.callback)(playing_backward);
-    }));
 }
 
 impl AnimationEvent {
@@ -336,25 +319,17 @@ impl AnimationEvent {
     #[must_use]
     pub fn new<F>(key_time: f32, callback: F) -> Option<Self>
     where
-        F: FnMut(bool) + 'static,
+        F: FnMut(bool) + Send + 'static,
     {
-        let state = Box::new(AnimationEventState {
-            callback: Box::new(callback),
-        });
-        let context = Box::into_raw(state).cast::<c_void>();
-        let ptr = unsafe {
-            scn_animation_event_new(
+        let callback: AnimationEventCallback = Box::new(callback);
+        let context = ManuallyDrop::new(CallbackState::new(CallbackCell::new(callback)));
+        unsafe {
+            Self::from_raw(scn_animation_event_new(
                 key_time,
-                context,
-                release_animation_event_context,
+                context.as_ptr(),
+                CallbackState::<AnimationEventCallback>::RELEASE,
                 animation_event_trampoline,
-            )
-        };
-        if ptr.is_null() {
-            release_animation_event_context(context);
-            None
-        } else {
-            unsafe { Self::from_raw(ptr) }
+            ))
         }
     }
 }

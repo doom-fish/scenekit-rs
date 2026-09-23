@@ -208,37 +208,37 @@ public func scn_timing_function_new_mode(_ mode: Int32) -> UnsafeMutableRawPoint
 
 public typealias AnimationEventCallback = @convention(c) (UnsafeMutableRawPointer?, Bool) -> Void
 
-private final class AnimationEventBox: NSObject {
-    let context: UnsafeMutableRawPointer?
-    let releaseContext: ScnReleaseContextCallback?
+private final class AnimationEventBox {
+    let context: UnsafeMutableRawPointer
+    let releaseContext: ScnReleaseContextCallback
+    let callback: AnimationEventCallback
 
-    init(context: UnsafeMutableRawPointer?, releaseContext: ScnReleaseContextCallback?) {
+    init(context: UnsafeMutableRawPointer, releaseContext: @escaping ScnReleaseContextCallback, callback: @escaping AnimationEventCallback) {
         self.context = context
         self.releaseContext = releaseContext
+        self.callback = callback
     }
 
     deinit {
-        releaseContext?(context)
+        releaseContext(context)
+    }
+
+    func invoke(_ playingBackward: Bool) {
+        callback(context, playingBackward)
     }
 }
-
-private var animationEventAssociationKey: UInt8 = 0
 
 @_cdecl("scn_animation_event_new")
 public func scn_animation_event_new(
     _ keyTime: Float,
     _ context: UnsafeMutableRawPointer?,
-    _ releaseContext: ScnReleaseContextCallback?,
+    _ releaseContext: @escaping ScnReleaseContextCallback,
     _ callback: @escaping AnimationEventCallback
 ) -> UnsafeMutableRawPointer? {
+    guard let context else { return nil }
+    let box = AnimationEventBox(context: context, releaseContext: releaseContext, callback: callback)
     let event = SCNAnimationEvent(keyTime: CGFloat(keyTime)) { _, _, playingBackward in
-        callback(context, playingBackward)
+        box.invoke(playingBackward)
     }
-    objc_setAssociatedObject(
-        event,
-        &animationEventAssociationKey,
-        AnimationEventBox(context: context, releaseContext: releaseContext),
-        .OBJC_ASSOCIATION_RETAIN_NONATOMIC
-    )
     return scnRetain(event)
 }

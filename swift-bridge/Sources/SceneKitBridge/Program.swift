@@ -116,14 +116,16 @@ private func programBindingStore(for program: SCNProgram) -> ProgramBindingStore
     return store
 }
 
+private var programDelegateKey: UInt8 = 0
+
 private final class ProgramDelegateBox: NSObject, SCNProgramDelegate {
-    let context: UnsafeMutableRawPointer?
-    let releaseContext: ScnReleaseContextCallback?
+    let context: UnsafeMutableRawPointer
+    let releaseContext: ScnReleaseContextCallback
     let handleError: ProgramErrorCallback
 
     init(
-        context: UnsafeMutableRawPointer?,
-        releaseContext: ScnReleaseContextCallback?,
+        context: UnsafeMutableRawPointer,
+        releaseContext: @escaping ScnReleaseContextCallback,
         handleError: @escaping ProgramErrorCallback
     ) {
         self.context = context
@@ -132,7 +134,7 @@ private final class ProgramDelegateBox: NSObject, SCNProgramDelegate {
     }
 
     deinit {
-        releaseContext?(context)
+        releaseContext(context)
     }
 
     func program(_ program: SCNProgram, handleError error: Error) {
@@ -141,13 +143,13 @@ private final class ProgramDelegateBox: NSObject, SCNProgramDelegate {
 }
 
 private final class ProgramBufferBindingBox {
-    let context: UnsafeMutableRawPointer?
-    let releaseContext: ScnReleaseContextCallback?
+    let context: UnsafeMutableRawPointer
+    let releaseContext: ScnReleaseContextCallback
     let callback: ProgramBufferBindingCallback
 
     init(
-        context: UnsafeMutableRawPointer?,
-        releaseContext: ScnReleaseContextCallback?,
+        context: UnsafeMutableRawPointer,
+        releaseContext: @escaping ScnReleaseContextCallback,
         callback: @escaping ProgramBufferBindingCallback
     ) {
         self.context = context
@@ -156,7 +158,7 @@ private final class ProgramBufferBindingBox {
     }
 
     deinit {
-        releaseContext?(context)
+        releaseContext(context)
     }
 
     func invoke(bufferStream: any SCNBufferStream) {
@@ -175,10 +177,11 @@ private final class ProgramTestBufferStream: NSObject, SCNBufferStream {
 @_cdecl("scn_program_delegate_new")
 public func scn_program_delegate_new(
     _ context: UnsafeMutableRawPointer?,
-    _ releaseContext: ScnReleaseContextCallback?,
+    _ releaseContext: @escaping ScnReleaseContextCallback,
     _ handleError: @escaping ProgramErrorCallback
 ) -> UnsafeMutableRawPointer? {
-    scnRetain(ProgramDelegateBox(
+    guard let context else { return nil }
+    return scnRetain(ProgramDelegateBox(
         context: context,
         releaseContext: releaseContext,
         handleError: handleError
@@ -188,10 +191,11 @@ public func scn_program_delegate_new(
 @_cdecl("scn_program_buffer_binding_new")
 public func scn_program_buffer_binding_new(
     _ context: UnsafeMutableRawPointer?,
-    _ releaseContext: ScnReleaseContextCallback?,
+    _ releaseContext: @escaping ScnReleaseContextCallback,
     _ callback: @escaping ProgramBufferBindingCallback
 ) -> UnsafeMutableRawPointer? {
-    scnRetain(ProgramBufferBindingBox(
+    guard let context else { return nil }
+    return scnRetain(ProgramBufferBindingBox(
         context: context,
         releaseContext: releaseContext,
         callback: callback
@@ -322,7 +326,16 @@ public func scn_program_copy_semantic_for_symbol(_ programHandle: UnsafeMutableR
 @_cdecl("scn_program_set_delegate")
 public func scn_program_set_delegate(_ programHandle: UnsafeMutableRawPointer?, _ delegateHandle: UnsafeMutableRawPointer?) {
     guard let program: SCNProgram = scnBorrow(programHandle) else { return }
-    program.delegate = scnBorrow(delegateHandle)
+    let delegate: ProgramDelegateBox? = scnBorrow(delegateHandle)
+    scnRetainDelegate(delegate, by: program, key: &programDelegateKey) {
+        program.delegate = delegate
+    }
+}
+
+@_cdecl("scn_program_get_delegate")
+public func scn_program_get_delegate(_ programHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
+    guard let program: SCNProgram = scnBorrow(programHandle) else { return nil }
+    return scnRetainedDelegate(of: program, key: &programDelegateKey)
 }
 
 @_cdecl("scn_program_set_buffer_binding")

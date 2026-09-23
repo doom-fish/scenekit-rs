@@ -1,11 +1,10 @@
 use core::ffi::c_void;
 use core::ptr;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::ffi;
 use crate::math::Vector3;
 use crate::node::Node;
-use crate::private::handle_type;
+use crate::private::{handle_type, invoke_callback, CallbackState, DelegateObject};
 use crate::view::View;
 use crate::{CGPoint, CGSize};
 
@@ -47,7 +46,7 @@ impl InteractionMode {
     }
 }
 
-type CameraControllerCallback = Box<dyn FnMut()>;
+type CameraControllerCallback = Box<dyn FnMut() + Send>;
 
 /// Stores Rust callbacks backing `SCNCameraControllerDelegate`.
 #[derive(Default)]
@@ -70,7 +69,7 @@ impl CameraControllerDelegateCallbacks {
     #[must_use]
     pub fn on_inertia_will_start<F>(mut self, callback: F) -> Self
     where
-        F: FnMut() + 'static,
+        F: FnMut() + Send + 'static,
     {
         self.inertia_will_start = Some(Box::new(callback));
         self
@@ -80,103 +79,66 @@ impl CameraControllerDelegateCallbacks {
     #[must_use]
     pub fn on_inertia_did_end<F>(mut self, callback: F) -> Self
     where
-        F: FnMut() + 'static,
+        F: FnMut() + Send + 'static,
     {
         self.inertia_did_end = Some(Box::new(callback));
         self
     }
 }
 
-struct CameraControllerDelegateState {
-    callbacks: CameraControllerDelegateCallbacks,
-}
-
 /// Wraps `SCNCameraControllerDelegate`.
+#[derive(Debug)]
 pub struct CameraControllerDelegate {
-    ptr: *mut c_void,
+    inner: DelegateObject<CameraControllerDelegateCallbacks>,
 }
 
-impl core::fmt::Debug for CameraControllerDelegate {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("CameraControllerDelegate")
-            .field("ptr", &self.ptr)
-            .finish()
-    }
-}
-
-crate::private::scn_retained!(
-    CameraControllerDelegate,
-    field = ptr,
-    release = ffi::scn_release
-);
-
-unsafe fn delegate_state_from_context<'a>(
-    context: *mut c_void,
-) -> &'a mut CameraControllerDelegateState {
-    &mut *context.cast::<CameraControllerDelegateState>()
-}
-
-extern "C" fn release_camera_controller_delegate_context(context: *mut c_void) {
-    if context.is_null() {
-        return;
-    }
+unsafe extern "C" fn camera_controller_inertia_will_start_trampoline(context: *mut c_void) {
     unsafe {
-        drop(Box::from_raw(
-            context.cast::<CameraControllerDelegateState>(),
-        ));
+        invoke_callback::<CameraControllerDelegateCallbacks, _>(
+            context,
+            "scenekit::CameraControllerDelegate::inertia_will_start",
+            |callbacks| {
+                if let Some(callback) = callbacks.inertia_will_start.as_mut() {
+                    callback();
+                }
+            },
+        );
     }
 }
 
-extern "C" fn camera_controller_inertia_will_start_trampoline(context: *mut c_void) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() {
-            return;
-        }
-        let state = unsafe { delegate_state_from_context(context) };
-        if let Some(callback) = state.callbacks.inertia_will_start.as_mut() {
-            callback();
-        }
-    }));
-}
-
-extern "C" fn camera_controller_inertia_did_end_trampoline(context: *mut c_void) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() {
-            return;
-        }
-        let state = unsafe { delegate_state_from_context(context) };
-        if let Some(callback) = state.callbacks.inertia_did_end.as_mut() {
-            callback();
-        }
-    }));
+unsafe extern "C" fn camera_controller_inertia_did_end_trampoline(context: *mut c_void) {
+    unsafe {
+        invoke_callback::<CameraControllerDelegateCallbacks, _>(
+            context,
+            "scenekit::CameraControllerDelegate::inertia_did_end",
+            |callbacks| {
+                if let Some(callback) = callbacks.inertia_did_end.as_mut() {
+                    callback();
+                }
+            },
+        );
+    }
 }
 
 impl CameraControllerDelegate {
     /// Creates a wrapped `SCNCameraControllerDelegate` instance.
     #[must_use]
     pub fn new(callbacks: CameraControllerDelegateCallbacks) -> Option<Self> {
-        let state = Box::new(CameraControllerDelegateState { callbacks });
-        let context = Box::into_raw(state).cast::<c_void>();
-        let ptr = unsafe {
+        DelegateObject::new(callbacks, |context| unsafe {
             ffi::scn_camera_controller_delegate_new(
                 context,
-                release_camera_controller_delegate_context,
+                CallbackState::<CameraControllerDelegateCallbacks>::RELEASE,
                 camera_controller_inertia_will_start_trampoline,
                 camera_controller_inertia_did_end_trampoline,
             )
-        };
-        if ptr.is_null() {
-            release_camera_controller_delegate_context(context);
-            None
-        } else {
-            Some(Self { ptr })
-        }
+        })
+        .map(|inner| Self { inner })
     }
 
     /// Returns the Objective-C pointer backing this `SCNCameraControllerDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
-        self.ptr
+        self.inner.as_ptr()
     }
 }
 
@@ -276,6 +238,11 @@ impl CameraControlConfiguration {
 }
 
 impl CameraController {
+    #[must_use]
+    pub fn new() -> Option<Self> {
+        unsafe { Self::from_raw(ffi::scn_camera_controller_new()) }
+    }
+
     /// Sets the `SCNCameraController.delegate` member.
     pub fn set_delegate(&self, delegate: Option<&CameraControllerDelegate>) {
         unsafe {
@@ -284,6 +251,12 @@ impl CameraController {
                 delegate.map_or(ptr::null_mut(), CameraControllerDelegate::as_ptr),
             );
         };
+    }
+
+    #[must_use]
+    pub fn delegate(&self) -> Option<CameraControllerDelegate> {
+        DelegateObject::from_retained(unsafe { ffi::scn_camera_controller_get_delegate(self.ptr) })
+            .map(|inner| CameraControllerDelegate { inner })
     }
 
     /// Mirrors `SCNCameraController.pointOfView`.

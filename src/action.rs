@@ -1,36 +1,28 @@
 use core::ffi::c_void;
-use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::Mutex;
+use core::mem::ManuallyDrop;
 
 use crate::ffi;
 use crate::math::Vector3;
 use crate::node::Node;
-use crate::private::handle_type;
+use crate::private::{handle_type, invoke_callback, CallbackCell, CallbackState};
 
 handle_type!(Action);
 
-type BoxedActionCallback = Box<dyn FnMut(Node, f64) + Send>;
+type BoxedActionCallback = Box<dyn FnMut(&Node, f64) + Send>;
 
-struct ActionCallbackState {
-    callback: Mutex<BoxedActionCallback>,
-}
-
-extern "C" fn action_invoke(context: *mut c_void, node: *mut c_void, elapsed: f64) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        let Some(context) = core::ptr::NonNull::new(context.cast::<ActionCallbackState>()) else {
-            return;
-        };
-        let state = unsafe { context.as_ref() };
-        if let Ok(mut callback) = state.callback.lock() {
-            let node = unsafe { Node::from_raw_borrowed(node) };
-            callback(node, elapsed);
-        }
-    }));
-}
-
-extern "C" fn action_drop(context: *mut c_void) {
-    if let Some(context) = core::ptr::NonNull::new(context.cast::<ActionCallbackState>()) {
-        unsafe { drop(Box::from_raw(context.as_ptr())) };
+unsafe extern "C" fn action_invoke(context: *mut c_void, node: *mut c_void, elapsed: f64) {
+    if node.is_null() {
+        return;
+    }
+    let node = unsafe { Node::from_raw_borrowed(node) };
+    unsafe {
+        invoke_callback::<BoxedActionCallback, _>(
+            context,
+            "scenekit::Action::custom",
+            |callback| {
+                callback(&node, elapsed);
+            },
+        );
     }
 }
 
@@ -97,17 +89,16 @@ impl Action {
     #[must_use]
     pub fn custom<F>(duration: f64, callback: F) -> Option<Self>
     where
-        F: FnMut(Node, f64) + Send + 'static,
+        F: FnMut(&Node, f64) + Send + 'static,
     {
-        let state = Box::new(ActionCallbackState {
-            callback: Mutex::new(Box::new(callback)),
-        });
+        let callback: BoxedActionCallback = Box::new(callback);
+        let context = ManuallyDrop::new(CallbackState::new(CallbackCell::new(callback)));
         unsafe {
             Self::from_raw(ffi::scn_action_custom(
                 duration,
-                Box::into_raw(state).cast(),
+                context.as_ptr(),
                 action_invoke,
-                action_drop,
+                CallbackState::<BoxedActionCallback>::RELEASE,
             ))
         }
     }

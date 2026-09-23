@@ -24,8 +24,8 @@ public func scn_array_get(_ arrayHandle: UnsafeMutableRawPointer?, _ index: Int)
 }
 
 private final class SceneRendererDelegateBox: NSObject, SCNSceneRendererDelegate {
-    let context: UnsafeMutableRawPointer?
-    let releaseContext: ScnReleaseContextCallback?
+    let context: UnsafeMutableRawPointer
+    let releaseContext: ScnReleaseContextCallback
     let update: SceneRendererTimeCallback
     let didApplyAnimations: SceneRendererTimeCallback
     let didSimulatePhysics: SceneRendererTimeCallback
@@ -34,8 +34,8 @@ private final class SceneRendererDelegateBox: NSObject, SCNSceneRendererDelegate
     let didRenderScene: SceneRendererSceneCallback
 
     init(
-        context: UnsafeMutableRawPointer?,
-        releaseContext: ScnReleaseContextCallback?,
+        context: UnsafeMutableRawPointer,
+        releaseContext: @escaping ScnReleaseContextCallback,
         update: @escaping SceneRendererTimeCallback,
         didApplyAnimations: @escaping SceneRendererTimeCallback,
         didSimulatePhysics: @escaping SceneRendererTimeCallback,
@@ -54,7 +54,7 @@ private final class SceneRendererDelegateBox: NSObject, SCNSceneRendererDelegate
     }
 
     deinit {
-        releaseContext?(context)
+        releaseContext(context)
     }
 
     func renderer(_ renderer: any SCNSceneRenderer, updateAtTime time: TimeInterval) {
@@ -85,7 +85,7 @@ private final class SceneRendererDelegateBox: NSObject, SCNSceneRendererDelegate
 @_cdecl("scn_scene_renderer_delegate_new")
 public func scn_scene_renderer_delegate_new(
     _ context: UnsafeMutableRawPointer?,
-    _ releaseContext: ScnReleaseContextCallback?,
+    _ releaseContext: @escaping ScnReleaseContextCallback,
     _ update: @escaping SceneRendererTimeCallback,
     _ didApplyAnimations: @escaping SceneRendererTimeCallback,
     _ didSimulatePhysics: @escaping SceneRendererTimeCallback,
@@ -93,7 +93,8 @@ public func scn_scene_renderer_delegate_new(
     _ willRenderScene: @escaping SceneRendererSceneCallback,
     _ didRenderScene: @escaping SceneRendererSceneCallback
 ) -> UnsafeMutableRawPointer? {
-    scnRetain(SceneRendererDelegateBox(
+    guard let context else { return nil }
+    return scnRetain(SceneRendererDelegateBox(
         context: context,
         releaseContext: releaseContext,
         update: update,

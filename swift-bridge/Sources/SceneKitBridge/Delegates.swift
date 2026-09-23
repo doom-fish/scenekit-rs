@@ -1,17 +1,22 @@
+import AppKit
 import Foundation
 import JavaScriptCore
+import ObjectiveC
 import SceneKit
+
+public typealias ScnNodePairCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+public typealias ScnNodePairPredicate = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Bool
+public typealias ScnWriteImageCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
+
+private var nodeRendererDelegateKey: UInt8 = 0
+private var avoidOccluderDelegateKey: UInt8 = 0
 
 private final class NodeRendererDelegateBox: NSObject, SCNNodeRendererDelegate {
     let context: UnsafeMutableRawPointer
-    let renderCallback: @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
-    let releaseContext: @convention(c) (UnsafeMutableRawPointer?) -> Void
+    let releaseContext: ScnReleaseContextCallback
+    let renderCallback: ScnNodePairCallback
 
-    init(
-        context: UnsafeMutableRawPointer,
-        releaseContext: @escaping @convention(c) (UnsafeMutableRawPointer?) -> Void,
-        renderCallback: @escaping @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
-    ) {
+    init(context: UnsafeMutableRawPointer, releaseContext: @escaping ScnReleaseContextCallback, renderCallback: @escaping ScnNodePairCallback) {
         self.context = context
         self.releaseContext = releaseContext
         self.renderCallback = renderCallback
@@ -22,15 +27,15 @@ private final class NodeRendererDelegateBox: NSObject, SCNNodeRendererDelegate {
     }
 
     func renderNode(_ node: SCNNode, renderer: SCNRenderer, arguments: [String : Any]) {
-        renderCallback(context, scnRetain(node), scnRetain(renderer))
+        renderCallback(context, Unmanaged.passUnretained(node).toOpaque(), Unmanaged.passUnretained(renderer).toOpaque())
     }
 }
 
 @_cdecl("scn_node_renderer_delegate_new")
 public func scn_node_renderer_delegate_new(
     _ context: UnsafeMutableRawPointer?,
-    _ releaseContext: @escaping @convention(c) (UnsafeMutableRawPointer?) -> Void,
-    _ renderCallback: @escaping @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+    _ releaseContext: @escaping ScnReleaseContextCallback,
+    _ renderCallback: @escaping ScnNodePairCallback
 ) -> UnsafeMutableRawPointer? {
     guard let context else { return nil }
     return scnRetain(NodeRendererDelegateBox(context: context, releaseContext: releaseContext, renderCallback: renderCallback))
@@ -38,15 +43,27 @@ public func scn_node_renderer_delegate_new(
 
 @_cdecl("scn_node_get_renderer_delegate")
 public func scn_node_get_renderer_delegate(_ nodeHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let node: SCNNode = scnBorrow(nodeHandle), let delegate = node.rendererDelegate else { return nil }
-    return scnRetain(delegate)
+    guard let node: SCNNode = scnBorrow(nodeHandle) else { return nil }
+    return scnRetainedDelegate(of: node, key: &nodeRendererDelegateKey)
 }
 
 @_cdecl("scn_node_set_renderer_delegate")
 public func scn_node_set_renderer_delegate(_ nodeHandle: UnsafeMutableRawPointer?, _ delegateHandle: UnsafeMutableRawPointer?) {
     guard let node: SCNNode = scnBorrow(nodeHandle) else { return }
-    let delegate: SCNNodeRendererDelegate? = scnBorrow(delegateHandle)
-    node.rendererDelegate = delegate
+    let delegate: NodeRendererDelegateBox? = scnBorrow(delegateHandle)
+    scnRetainDelegate(delegate, by: node, key: &nodeRendererDelegateKey) {
+        node.rendererDelegate = delegate
+    }
+}
+
+func scnAdoptRendererDelegates(from original: SCNNode, to clone: SCNNode) {
+    if let delegate = objc_getAssociatedObject(original, &nodeRendererDelegateKey) as? NodeRendererDelegateBox,
+       (clone.rendererDelegate as AnyObject?) === delegate {
+        objc_setAssociatedObject(clone, &nodeRendererDelegateKey, delegate, .OBJC_ASSOCIATION_RETAIN)
+    }
+    for (originalChild, cloneChild) in zip(original.childNodes, clone.childNodes) {
+        scnAdoptRendererDelegates(from: originalChild, to: cloneChild)
+    }
 }
 
 @_cdecl("scn_node_test_invoke_renderer_delegate")
@@ -57,15 +74,15 @@ public func scn_node_test_invoke_renderer_delegate(_ nodeHandle: UnsafeMutableRa
 
 private final class AvoidOccluderConstraintDelegateBox: NSObject, SCNAvoidOccluderConstraintDelegate {
     let context: UnsafeMutableRawPointer
-    let shouldAvoidCallback: @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Bool
-    let didAvoidCallback: @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
-    let releaseContext: @convention(c) (UnsafeMutableRawPointer?) -> Void
+    let releaseContext: ScnReleaseContextCallback
+    let shouldAvoidCallback: ScnNodePairPredicate
+    let didAvoidCallback: ScnNodePairCallback
 
     init(
         context: UnsafeMutableRawPointer,
-        releaseContext: @escaping @convention(c) (UnsafeMutableRawPointer?) -> Void,
-        shouldAvoidCallback: @escaping @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Bool,
-        didAvoidCallback: @escaping @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+        releaseContext: @escaping ScnReleaseContextCallback,
+        shouldAvoidCallback: @escaping ScnNodePairPredicate,
+        didAvoidCallback: @escaping ScnNodePairCallback
     ) {
         self.context = context
         self.releaseContext = releaseContext
@@ -78,20 +95,20 @@ private final class AvoidOccluderConstraintDelegateBox: NSObject, SCNAvoidOcclud
     }
 
     func avoidOccluderConstraint(_ constraint: SCNAvoidOccluderConstraint, shouldAvoidOccluder occluder: SCNNode, for node: SCNNode) -> Bool {
-        shouldAvoidCallback(context, scnRetain(occluder), scnRetain(node))
+        shouldAvoidCallback(context, Unmanaged.passUnretained(occluder).toOpaque(), Unmanaged.passUnretained(node).toOpaque())
     }
 
     func avoidOccluderConstraint(_ constraint: SCNAvoidOccluderConstraint, didAvoidOccluder occluder: SCNNode, for node: SCNNode) {
-        didAvoidCallback(context, scnRetain(occluder), scnRetain(node))
+        didAvoidCallback(context, Unmanaged.passUnretained(occluder).toOpaque(), Unmanaged.passUnretained(node).toOpaque())
     }
 }
 
 @_cdecl("scn_avoid_occluder_constraint_delegate_new")
 public func scn_avoid_occluder_constraint_delegate_new(
     _ context: UnsafeMutableRawPointer?,
-    _ releaseContext: @escaping @convention(c) (UnsafeMutableRawPointer?) -> Void,
-    _ shouldAvoidCallback: @escaping @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Bool,
-    _ didAvoidCallback: @escaping @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
+    _ releaseContext: @escaping ScnReleaseContextCallback,
+    _ shouldAvoidCallback: @escaping ScnNodePairPredicate,
+    _ didAvoidCallback: @escaping ScnNodePairCallback
 ) -> UnsafeMutableRawPointer? {
     guard let context else { return nil }
     return scnRetain(
@@ -107,15 +124,16 @@ public func scn_avoid_occluder_constraint_delegate_new(
 @_cdecl("scn_avoid_occluder_constraint_get_delegate")
 public func scn_avoid_occluder_constraint_get_delegate(_ constraintHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
     guard let constraint: SCNAvoidOccluderConstraint = scnBorrow(constraintHandle) else { return nil }
-    guard let delegate = constraint.value(forKey: "delegate") as? SCNAvoidOccluderConstraintDelegate else { return nil }
-    return scnRetain(delegate)
+    return scnRetainedDelegate(of: constraint, key: &avoidOccluderDelegateKey)
 }
 
 @_cdecl("scn_avoid_occluder_constraint_set_delegate")
 public func scn_avoid_occluder_constraint_set_delegate(_ constraintHandle: UnsafeMutableRawPointer?, _ delegateHandle: UnsafeMutableRawPointer?) {
     guard let constraint: SCNAvoidOccluderConstraint = scnBorrow(constraintHandle) else { return }
-    let delegate: SCNAvoidOccluderConstraintDelegate? = scnBorrow(delegateHandle)
-    constraint.setValue(delegate, forKey: "delegate")
+    let delegate: AvoidOccluderConstraintDelegateBox? = scnBorrow(delegateHandle)
+    scnRetainDelegate(delegate, by: constraint, key: &avoidOccluderDelegateKey) {
+        constraint.setValue(delegate, forKey: "delegate")
+    }
 }
 
 @_cdecl("scn_avoid_occluder_constraint_test_invoke_should")
@@ -142,14 +160,10 @@ public func scn_avoid_occluder_constraint_test_invoke_did(
 
 private final class SceneExportDelegateBox: NSObject, SCNSceneExportDelegate {
     let context: UnsafeMutableRawPointer
-    let writeImageCallback: @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafePointer<CChar>?
-    let releaseContext: @convention(c) (UnsafeMutableRawPointer?) -> Void
+    let releaseContext: ScnReleaseContextCallback
+    let writeImageCallback: ScnWriteImageCallback
 
-    init(
-        context: UnsafeMutableRawPointer,
-        releaseContext: @escaping @convention(c) (UnsafeMutableRawPointer?) -> Void,
-        writeImageCallback: @escaping @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafePointer<CChar>?
-    ) {
+    init(context: UnsafeMutableRawPointer, releaseContext: @escaping ScnReleaseContextCallback, writeImageCallback: @escaping ScnWriteImageCallback) {
         self.context = context
         self.releaseContext = releaseContext
         self.writeImageCallback = writeImageCallback
@@ -160,15 +174,16 @@ private final class SceneExportDelegateBox: NSObject, SCNSceneExportDelegate {
     }
 
     func write(_ image: NSImage, withSceneDocumentURL documentURL: URL, originalImageURL: URL?) -> URL? {
-        let documentCString = documentURL.path.withCString { strdup($0) }
-        let originalCString = originalImageURL?.path.withCString { strdup($0) }
-        defer {
-            if let documentCString { free(documentCString) }
-            if let originalCString { free(originalCString) }
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let imageHandle = Unmanaged.passRetained(cgImage).toOpaque()
+        let resolved: UnsafeMutablePointer<CChar>? = documentURL.path.withCString { documentPath in
+            guard let originalPath = originalImageURL?.path else {
+                return writeImageCallback(context, imageHandle, documentPath, nil)
+            }
+            return originalPath.withCString { writeImageCallback(context, imageHandle, documentPath, $0) }
         }
-        guard let resolved = writeImageCallback(context, documentCString, originalCString) else {
-            return nil
-        }
+        guard let resolved else { return nil }
+        defer { free(resolved) }
         return URL(fileURLWithPath: String(cString: resolved))
     }
 }
@@ -176,20 +191,54 @@ private final class SceneExportDelegateBox: NSObject, SCNSceneExportDelegate {
 @_cdecl("scn_scene_export_delegate_new")
 public func scn_scene_export_delegate_new(
     _ context: UnsafeMutableRawPointer?,
-    _ releaseContext: @escaping @convention(c) (UnsafeMutableRawPointer?) -> Void,
-    _ writeImageCallback: @escaping @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafePointer<CChar>?
+    _ releaseContext: @escaping ScnReleaseContextCallback,
+    _ writeImageCallback: @escaping ScnWriteImageCallback
 ) -> UnsafeMutableRawPointer? {
     guard let context else { return nil }
     return scnRetain(SceneExportDelegateBox(context: context, releaseContext: releaseContext, writeImageCallback: writeImageCallback))
 }
 
+private final class SceneExportErrorBox {
+    private let lock = NSLock()
+    private var message: String?
+
+    func record(_ error: Error) {
+        lock.lock()
+        defer { lock.unlock() }
+        message = error.localizedDescription
+    }
+
+    var recorded: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return message
+    }
+}
+
 @_cdecl("scn_scene_write_to_url")
-public func scn_scene_write_to_url(_ sceneHandle: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?, _ delegateHandle: UnsafeMutableRawPointer?) -> Bool {
-    guard let scene: SCNScene = scnBorrow(sceneHandle), let path else { return false }
+public func scn_scene_write_to_url(
+    _ sceneHandle: UnsafeMutableRawPointer?,
+    _ path: UnsafePointer<CChar>?,
+    _ delegateHandle: UnsafeMutableRawPointer?,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> Bool {
+    outError?.pointee = nil
+    guard let scene: SCNScene = scnBorrow(sceneHandle), let path else {
+        outError?.pointee = scnDup("missing scene or path")
+        return false
+    }
     let delegate: SCNSceneExportDelegate? = scnBorrow(delegateHandle)
     let url = URL(fileURLWithPath: String(cString: path))
-    scene.write(to: url, options: nil, delegate: delegate, progressHandler: nil)
-    return FileManager.default.fileExists(atPath: url.path)
+    let errors = SceneExportErrorBox()
+    let written = scene.write(to: url, options: nil, delegate: delegate) { _, error, _ in
+        if let error {
+            errors.record(error)
+        }
+    }
+    if !written {
+        outError?.pointee = scnDup(errors.recorded ?? "SCNScene.write(to:options:delegate:progressHandler:) returned false")
+    }
+    return written
 }
 
 @_cdecl("scn_export_javascript_module")

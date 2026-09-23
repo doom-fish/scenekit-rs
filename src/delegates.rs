@@ -1,66 +1,61 @@
 use core::ffi::{c_char, c_void};
 use core::ptr;
-use std::ffi::CString;
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::ffi::{CStr, CString};
 use std::path::Path;
 
+use apple_cf::cg::CGImage;
+
+use crate::error::{take_error, take_string, SceneKitError};
 use crate::extended_constraints::AvoidOccluderConstraint;
 use crate::node::Node;
-use crate::private::cstring_from_path;
+use crate::private::{cstring_from_path, invoke_callback, CallbackState, DelegateObject};
 use crate::renderer::Renderer;
 use crate::scene::Scene;
+
+type ReleaseContext = unsafe extern "C" fn(*mut c_void);
+type NodePairCallback = unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void);
+type NodePairPredicate = unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void) -> bool;
+type WriteImageCallback =
+    unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_char, *const c_char) -> *mut c_char;
 
 extern "C" {
     fn scn_node_renderer_delegate_new(
         context: *mut c_void,
-        release_context: extern "C" fn(*mut c_void),
-        render_callback: extern "C" fn(*mut c_void, *mut c_void, *mut c_void),
+        release_context: ReleaseContext,
+        render_callback: NodePairCallback,
     ) -> *mut c_void;
     fn scn_node_get_renderer_delegate(node: *mut c_void) -> *mut c_void;
     fn scn_node_set_renderer_delegate(node: *mut c_void, delegate: *mut c_void);
-    fn scn_node_test_invoke_renderer_delegate(node: *mut c_void, renderer: *mut c_void);
 
     fn scn_avoid_occluder_constraint_delegate_new(
         context: *mut c_void,
-        release_context: extern "C" fn(*mut c_void),
-        should_avoid_callback: extern "C" fn(*mut c_void, *mut c_void, *mut c_void) -> bool,
-        did_avoid_callback: extern "C" fn(*mut c_void, *mut c_void, *mut c_void),
+        release_context: ReleaseContext,
+        should_avoid_callback: NodePairPredicate,
+        did_avoid_callback: NodePairCallback,
     ) -> *mut c_void;
     fn scn_avoid_occluder_constraint_get_delegate(constraint: *mut c_void) -> *mut c_void;
     fn scn_avoid_occluder_constraint_set_delegate(constraint: *mut c_void, delegate: *mut c_void);
-    fn scn_avoid_occluder_constraint_test_invoke_should(
-        constraint: *mut c_void,
-        occluder: *mut c_void,
-        node: *mut c_void,
-    ) -> bool;
-    fn scn_avoid_occluder_constraint_test_invoke_did(
-        constraint: *mut c_void,
-        occluder: *mut c_void,
-        node: *mut c_void,
-    );
 
     fn scn_scene_export_delegate_new(
         context: *mut c_void,
-        release_context: extern "C" fn(*mut c_void),
-        write_image_callback: extern "C" fn(
-            *mut c_void,
-            *const c_char,
-            *const c_char,
-        ) -> *const c_char,
+        release_context: ReleaseContext,
+        write_image_callback: WriteImageCallback,
     ) -> *mut c_void;
     fn scn_scene_write_to_url(
         scene: *mut c_void,
         path: *const c_char,
         delegate: *mut c_void,
+        out_error: *mut *mut c_char,
     ) -> bool;
 
     fn scn_export_javascript_module(context: *mut c_void);
 }
 
-type NodeRendererCallback = Box<dyn FnMut(&Node, &Renderer)>;
-type AvoidOccluderShouldCallback = Box<dyn FnMut(&Node, &Node) -> bool>;
-type AvoidOccluderDidCallback = Box<dyn FnMut(&Node, &Node)>;
-type SceneExportWriteImageCallback = Box<dyn FnMut(&str, Option<&str>) -> Option<String>>;
+type NodeRendererCallback = Box<dyn FnMut(&Node, &Renderer) + Send>;
+type AvoidOccluderShouldCallback = Box<dyn FnMut(&Node, &Node) -> bool + Send>;
+type AvoidOccluderDidCallback = Box<dyn FnMut(&Node, &Node) + Send>;
+type SceneExportWriteImageCallback =
+    Box<dyn FnMut(&CGImage, &str, Option<&str>) -> Option<String> + Send>;
 
 /// Stores Rust callbacks backing `SCNNodeRendererDelegate`.
 #[derive(Default)]
@@ -79,94 +74,60 @@ impl NodeRendererDelegateCallbacks {
     #[must_use]
     pub fn on_render<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&Node, &Renderer) + 'static,
+        F: FnMut(&Node, &Renderer) + Send + 'static,
     {
         self.render = Some(Box::new(callback));
         self
     }
 }
 
-struct NodeRendererDelegateState {
-    callbacks: NodeRendererDelegateCallbacks,
-}
-
 /// Wraps `SCNNodeRendererDelegate`.
+#[derive(Debug)]
 pub struct NodeRendererDelegate {
-    ptr: *mut c_void,
+    inner: DelegateObject<NodeRendererDelegateCallbacks>,
 }
 
-impl core::fmt::Debug for NodeRendererDelegate {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("NodeRendererDelegate")
-            .field("ptr", &self.ptr)
-            .finish()
-    }
-}
-
-crate::private::scn_retained!(
-    NodeRendererDelegate,
-    field = ptr,
-    release = crate::ffi::scn_release
-);
-
-unsafe fn node_renderer_state_from_context<'a>(
-    context: *mut c_void,
-) -> &'a mut NodeRendererDelegateState {
-    &mut *context.cast::<NodeRendererDelegateState>()
-}
-
-extern "C" fn release_node_renderer_context(context: *mut c_void) {
-    if context.is_null() {
-        return;
-    }
-    unsafe {
-        drop(Box::from_raw(context.cast::<NodeRendererDelegateState>()));
-    }
-}
-
-extern "C" fn node_renderer_trampoline(
+unsafe extern "C" fn node_renderer_trampoline(
     context: *mut c_void,
     node: *mut c_void,
     renderer: *mut c_void,
 ) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() || node.is_null() || renderer.is_null() {
-            return;
-        }
-        let state = unsafe { node_renderer_state_from_context(context) };
-        if let Some(callback) = state.callbacks.render.as_mut() {
-            let node = unsafe { Node::from_raw_borrowed(node) };
-            let renderer = unsafe { Renderer::from_raw_borrowed(renderer) };
-            callback(&node, &renderer);
-        }
-    }));
+    if node.is_null() || renderer.is_null() {
+        return;
+    }
+    let node = unsafe { Node::from_raw_borrowed(node) };
+    let renderer = unsafe { Renderer::from_raw_borrowed(renderer) };
+    unsafe {
+        invoke_callback::<NodeRendererDelegateCallbacks, _>(
+            context,
+            "scenekit::NodeRendererDelegate::render",
+            |callbacks| {
+                if let Some(render) = callbacks.render.as_mut() {
+                    render(&node, &renderer);
+                }
+            },
+        );
+    }
 }
 
 impl NodeRendererDelegate {
     /// Creates a wrapped `SCNNodeRendererDelegate` instance.
     #[must_use]
     pub fn new(callbacks: NodeRendererDelegateCallbacks) -> Option<Self> {
-        let state = Box::new(NodeRendererDelegateState { callbacks });
-        let context = Box::into_raw(state).cast::<c_void>();
-        let ptr = unsafe {
+        DelegateObject::new(callbacks, |context| unsafe {
             scn_node_renderer_delegate_new(
                 context,
-                release_node_renderer_context,
+                CallbackState::<NodeRendererDelegateCallbacks>::RELEASE,
                 node_renderer_trampoline,
             )
-        };
-        if ptr.is_null() {
-            release_node_renderer_context(context);
-            None
-        } else {
-            Some(Self { ptr })
-        }
+        })
+        .map(|inner| Self { inner })
     }
 
     /// Returns the Objective-C pointer backing this `SCNNodeRendererDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
-        self.ptr
+        self.inner.as_ptr()
     }
 }
 
@@ -191,7 +152,7 @@ impl AvoidOccluderConstraintDelegateCallbacks {
     #[must_use]
     pub fn on_should_avoid_occluder<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&Node, &Node) -> bool + 'static,
+        F: FnMut(&Node, &Node) -> bool + Send + 'static,
     {
         self.should_avoid_occluder = Some(Box::new(callback));
         self
@@ -201,189 +162,129 @@ impl AvoidOccluderConstraintDelegateCallbacks {
     #[must_use]
     pub fn on_did_avoid_occluder<F>(mut self, callback: F) -> Self
     where
-        F: FnMut(&Node, &Node) + 'static,
+        F: FnMut(&Node, &Node) + Send + 'static,
     {
         self.did_avoid_occluder = Some(Box::new(callback));
         self
     }
 }
 
-struct AvoidOccluderConstraintDelegateState {
-    callbacks: AvoidOccluderConstraintDelegateCallbacks,
-}
-
 /// Wraps `SCNAvoidOccluderConstraintDelegate`.
+#[derive(Debug)]
 pub struct AvoidOccluderConstraintDelegate {
-    ptr: *mut c_void,
+    inner: DelegateObject<AvoidOccluderConstraintDelegateCallbacks>,
 }
 
-impl core::fmt::Debug for AvoidOccluderConstraintDelegate {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AvoidOccluderConstraintDelegate")
-            .field("ptr", &self.ptr)
-            .finish()
-    }
-}
-
-crate::private::scn_retained!(
-    AvoidOccluderConstraintDelegate,
-    field = ptr,
-    release = crate::ffi::scn_release
-);
-
-unsafe fn avoid_occluder_state_from_context<'a>(
-    context: *mut c_void,
-) -> &'a mut AvoidOccluderConstraintDelegateState {
-    &mut *context.cast::<AvoidOccluderConstraintDelegateState>()
-}
-
-extern "C" fn release_avoid_occluder_context(context: *mut c_void) {
-    if context.is_null() {
-        return;
-    }
-    unsafe {
-        drop(Box::from_raw(
-            context.cast::<AvoidOccluderConstraintDelegateState>(),
-        ));
-    }
-}
-
-extern "C" fn avoid_occluder_should_trampoline(
+unsafe extern "C" fn avoid_occluder_should_trampoline(
     context: *mut c_void,
     occluder: *mut c_void,
     node: *mut c_void,
 ) -> bool {
-    catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() || occluder.is_null() || node.is_null() {
-            return true;
-        }
-        let state = unsafe { avoid_occluder_state_from_context(context) };
-        state
-            .callbacks
-            .should_avoid_occluder
-            .as_mut()
-            .is_none_or(|callback| {
-                let occluder = unsafe { Node::from_raw_borrowed(occluder) };
-                let node = unsafe { Node::from_raw_borrowed(node) };
-                callback(&occluder, &node)
-            })
-    }))
+    if occluder.is_null() || node.is_null() {
+        return true;
+    }
+    let occluder = unsafe { Node::from_raw_borrowed(occluder) };
+    let node = unsafe { Node::from_raw_borrowed(node) };
+    unsafe {
+        invoke_callback::<AvoidOccluderConstraintDelegateCallbacks, _>(
+            context,
+            "scenekit::AvoidOccluderConstraintDelegate::should_avoid_occluder",
+            |callbacks| {
+                callbacks
+                    .should_avoid_occluder
+                    .as_mut()
+                    .map(|callback| callback(&occluder, &node))
+            },
+        )
+    }
+    .flatten()
     .unwrap_or(true)
 }
 
-extern "C" fn avoid_occluder_did_trampoline(
+unsafe extern "C" fn avoid_occluder_did_trampoline(
     context: *mut c_void,
     occluder: *mut c_void,
     node: *mut c_void,
 ) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() || occluder.is_null() || node.is_null() {
-            return;
-        }
-        let state = unsafe { avoid_occluder_state_from_context(context) };
-        if let Some(callback) = state.callbacks.did_avoid_occluder.as_mut() {
-            let occluder = unsafe { Node::from_raw_borrowed(occluder) };
-            let node = unsafe { Node::from_raw_borrowed(node) };
-            callback(&occluder, &node);
-        }
-    }));
+    if occluder.is_null() || node.is_null() {
+        return;
+    }
+    let occluder = unsafe { Node::from_raw_borrowed(occluder) };
+    let node = unsafe { Node::from_raw_borrowed(node) };
+    unsafe {
+        invoke_callback::<AvoidOccluderConstraintDelegateCallbacks, _>(
+            context,
+            "scenekit::AvoidOccluderConstraintDelegate::did_avoid_occluder",
+            |callbacks| {
+                if let Some(callback) = callbacks.did_avoid_occluder.as_mut() {
+                    callback(&occluder, &node);
+                }
+            },
+        );
+    }
 }
 
 impl AvoidOccluderConstraintDelegate {
     /// Creates a wrapped `SCNAvoidOccluderConstraintDelegate` instance.
     #[must_use]
     pub fn new(callbacks: AvoidOccluderConstraintDelegateCallbacks) -> Option<Self> {
-        let state = Box::new(AvoidOccluderConstraintDelegateState { callbacks });
-        let context = Box::into_raw(state).cast::<c_void>();
-        let ptr = unsafe {
+        DelegateObject::new(callbacks, |context| unsafe {
             scn_avoid_occluder_constraint_delegate_new(
                 context,
-                release_avoid_occluder_context,
+                CallbackState::<AvoidOccluderConstraintDelegateCallbacks>::RELEASE,
                 avoid_occluder_should_trampoline,
                 avoid_occluder_did_trampoline,
             )
-        };
-        if ptr.is_null() {
-            release_avoid_occluder_context(context);
-            None
-        } else {
-            Some(Self { ptr })
-        }
+        })
+        .map(|inner| Self { inner })
     }
 
     /// Returns the Objective-C pointer backing this `SCNAvoidOccluderConstraintDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
-        self.ptr
+        self.inner.as_ptr()
     }
-}
-
-struct SceneExportDelegateState {
-    callback: SceneExportWriteImageCallback,
-    returned_path: Option<CString>,
 }
 
 /// Wraps `SCNSceneExportDelegate`.
+#[derive(Debug)]
 pub struct SceneExportDelegate {
-    ptr: *mut c_void,
+    inner: DelegateObject<SceneExportWriteImageCallback>,
 }
 
-impl core::fmt::Debug for SceneExportDelegate {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("SceneExportDelegate")
-            .field("ptr", &self.ptr)
-            .finish()
-    }
-}
-
-crate::private::scn_retained!(
-    SceneExportDelegate,
-    field = ptr,
-    release = crate::ffi::scn_release
-);
-
-unsafe fn scene_export_state_from_context<'a>(
+unsafe extern "C" fn scene_export_write_image_trampoline(
     context: *mut c_void,
-) -> &'a mut SceneExportDelegateState {
-    &mut *context.cast::<SceneExportDelegateState>()
-}
-
-extern "C" fn release_scene_export_context(context: *mut c_void) {
-    if context.is_null() {
-        return;
-    }
-    unsafe {
-        drop(Box::from_raw(context.cast::<SceneExportDelegateState>()));
-    }
-}
-
-extern "C" fn scene_export_write_image_trampoline(
-    context: *mut c_void,
+    image: *mut c_void,
     document_url: *const c_char,
     original_image_url: *const c_char,
-) -> *const c_char {
-    catch_unwind(AssertUnwindSafe(|| {
-        if context.is_null() || document_url.is_null() {
-            return ptr::null();
-        }
-        let state = unsafe { scene_export_state_from_context(context) };
-        let document_url = unsafe { std::ffi::CStr::from_ptr(document_url) }
+) -> *mut c_char {
+    if image.is_null() {
+        return ptr::null_mut();
+    }
+    let image = unsafe { CGImage::from_raw(image) };
+    if document_url.is_null() {
+        return ptr::null_mut();
+    }
+    let document_url = unsafe { CStr::from_ptr(document_url) }
+        .to_string_lossy()
+        .into_owned();
+    let original_image_url = (!original_image_url.is_null()).then(|| {
+        unsafe { CStr::from_ptr(original_image_url) }
             .to_string_lossy()
-            .into_owned();
-        let original_image_url = (!original_image_url.is_null()).then(|| unsafe {
-            std::ffi::CStr::from_ptr(original_image_url)
-                .to_string_lossy()
-                .into_owned()
-        });
-        state.returned_path =
-            (state.callback)(document_url.as_str(), original_image_url.as_deref())
-                .and_then(|path| CString::new(path).ok());
-        state
-            .returned_path
-            .as_ref()
-            .map_or(ptr::null(), |path| path.as_ptr())
-    }))
-    .unwrap_or(ptr::null())
+            .into_owned()
+    });
+    unsafe {
+        invoke_callback::<SceneExportWriteImageCallback, _>(
+            context,
+            "scenekit::SceneExportDelegate::write_image",
+            |callback| callback(&image, &document_url, original_image_url.as_deref()),
+        )
+    }
+    .flatten()
+    .and_then(|path| CString::new(path).ok())
+    .map_or(ptr::null_mut(), |path| unsafe {
+        libc::strdup(path.as_ptr())
+    })
 }
 
 impl SceneExportDelegate {
@@ -391,32 +292,23 @@ impl SceneExportDelegate {
     #[must_use]
     pub fn new<F>(callback: F) -> Option<Self>
     where
-        F: FnMut(&str, Option<&str>) -> Option<String> + 'static,
+        F: FnMut(&CGImage, &str, Option<&str>) -> Option<String> + Send + 'static,
     {
-        let state = Box::new(SceneExportDelegateState {
-            callback: Box::new(callback),
-            returned_path: None,
-        });
-        let context = Box::into_raw(state).cast::<c_void>();
-        let ptr = unsafe {
+        let callback: SceneExportWriteImageCallback = Box::new(callback);
+        DelegateObject::new(callback, |context| unsafe {
             scn_scene_export_delegate_new(
                 context,
-                release_scene_export_context,
+                CallbackState::<SceneExportWriteImageCallback>::RELEASE,
                 scene_export_write_image_trampoline,
             )
-        };
-        if ptr.is_null() {
-            release_scene_export_context(context);
-            None
-        } else {
-            Some(Self { ptr })
-        }
+        })
+        .map(|inner| Self { inner })
     }
 
     /// Returns the Objective-C pointer backing this `SCNSceneExportDelegate` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *mut c_void {
-        self.ptr
+        self.inner.as_ptr()
     }
 }
 
@@ -434,17 +326,8 @@ impl Node {
     /// Mirrors `SCNNode.rendererDelegate`.
     #[must_use]
     pub fn renderer_delegate(&self) -> Option<NodeRendererDelegate> {
-        unsafe {
-            Some(NodeRendererDelegate {
-                ptr: scn_node_get_renderer_delegate(self.as_ptr()),
-            })
-            .filter(|d| !d.ptr.is_null())
-        }
-    }
-
-    /// Mirrors `SCNNode.testInvokeRendererDelegate`.
-    pub fn test_invoke_renderer_delegate(&self, renderer: &Renderer) {
-        unsafe { scn_node_test_invoke_renderer_delegate(self.as_ptr(), renderer.as_ptr()) };
+        DelegateObject::from_retained(unsafe { scn_node_get_renderer_delegate(self.as_ptr()) })
+            .map(|inner| NodeRendererDelegate { inner })
     }
 }
 
@@ -462,55 +345,41 @@ impl AvoidOccluderConstraint {
     /// Mirrors `SCNAvoidOccluderConstraint.delegate`.
     #[must_use]
     pub fn delegate(&self) -> Option<AvoidOccluderConstraintDelegate> {
-        unsafe {
-            Some(AvoidOccluderConstraintDelegate {
-                ptr: scn_avoid_occluder_constraint_get_delegate(self.as_ptr()),
-            })
-            .filter(|d| !d.ptr.is_null())
-        }
-    }
-
-    /// Mirrors `SCNAvoidOccluderConstraint.testInvokeShouldAvoidOccluder`.
-    #[must_use]
-    pub fn test_invoke_should_avoid_occluder(&self, occluder: &Node, node: &Node) -> bool {
-        unsafe {
-            scn_avoid_occluder_constraint_test_invoke_should(
-                self.as_ptr(),
-                occluder.as_ptr(),
-                node.as_ptr(),
-            )
-        }
-    }
-
-    /// Mirrors `SCNAvoidOccluderConstraint.testInvokeDidAvoidOccluder`.
-    pub fn test_invoke_did_avoid_occluder(&self, occluder: &Node, node: &Node) {
-        unsafe {
-            scn_avoid_occluder_constraint_test_invoke_did(
-                self.as_ptr(),
-                occluder.as_ptr(),
-                node.as_ptr(),
-            );
-        };
+        DelegateObject::from_retained(unsafe {
+            scn_avoid_occluder_constraint_get_delegate(self.as_ptr())
+        })
+        .map(|inner| AvoidOccluderConstraintDelegate { inner })
     }
 }
 
 impl Scene {
     /// Mirrors `SCNScene.writeToUrl`.
-    #[must_use]
     pub fn write_to_url(
         &self,
         path: impl AsRef<Path>,
         delegate: Option<&SceneExportDelegate>,
-    ) -> bool {
-        let Some(path) = cstring_from_path(path.as_ref()) else {
-            return false;
-        };
-        unsafe {
+    ) -> Result<(), SceneKitError> {
+        let path = cstring_from_path(path.as_ref())
+            .ok_or_else(|| SceneKitError::new("path contains an interior NUL byte"))?;
+        let mut error = ptr::null_mut();
+        let written = unsafe {
             scn_scene_write_to_url(
                 self.as_ptr(),
                 path.as_ptr(),
                 delegate.map_or(ptr::null_mut(), SceneExportDelegate::as_ptr),
+                &raw mut error,
             )
+        };
+        if written {
+            drop(unsafe { take_string(error) });
+            Ok(())
+        } else {
+            Err(unsafe {
+                take_error(
+                    error,
+                    "SCNScene.write(to:options:delegate:progressHandler:) failed",
+                )
+            })
         }
     }
 }
