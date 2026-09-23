@@ -1,12 +1,15 @@
-/// Represents an `SCNVector3` value.
+/// Three `f32` components exchanged with SceneKit's `SCNVector3`.
+///
+/// On macOS `SCNVector3` stores `CGFloat` (64-bit) components, so this is not its
+/// memory layout: the bridge converts each component, rounding to `f32` on the way out.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Vector3 {
-    /// X component matching the `SCNVector3` layout.
+    /// X component, converted to and from the `CGFloat` in `SCNVector3`.
     pub x: f32,
-    /// Y component matching the `SCNVector3` layout.
+    /// Y component, converted to and from the `CGFloat` in `SCNVector3`.
     pub y: f32,
-    /// Z component matching the `SCNVector3` layout.
+    /// Z component, converted to and from the `CGFloat` in `SCNVector3`.
     pub z: f32,
 }
 
@@ -23,30 +26,30 @@ impl Vector3 {
         Self::new(0.0, 0.0, 0.0)
     }
 
-    /// Returns the Objective-C pointer backing this `SCNVector3` wrapper.
+    /// Returns a pointer to the first of the three `f32` components.
     #[must_use]
     pub const fn as_ptr(&self) -> *const f32 {
         &raw const self.x
     }
 
-    /// Returns the raw pointer used to drive the `SCNVector3` protocol surface.
+    /// Returns a mutable pointer to the first of the three `f32` components.
     #[must_use]
     pub fn as_mut_ptr(&mut self) -> *mut f32 {
         &raw mut self.x
     }
 }
 
-/// Represents an `SCNVector4` value.
+/// Four `f32` components exchanged with SceneKit's `CGFloat`-based `SCNVector4`.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Vector4 {
-    /// X component matching the `SCNVector4` layout.
+    /// X component, converted to and from the `CGFloat` in `SCNVector4`.
     pub x: f32,
-    /// Y component matching the `SCNVector4` layout.
+    /// Y component, converted to and from the `CGFloat` in `SCNVector4`.
     pub y: f32,
-    /// Z component matching the `SCNVector4` layout.
+    /// Z component, converted to and from the `CGFloat` in `SCNVector4`.
     pub z: f32,
-    /// W component matching the `SCNVector4` layout.
+    /// W component, converted to and from the `CGFloat` in `SCNVector4`.
     pub w: f32,
 }
 
@@ -57,24 +60,24 @@ impl Vector4 {
         Self { x, y, z, w }
     }
 
-    /// Returns the Objective-C pointer backing this `SCNVector4` wrapper.
+    /// Returns a pointer to the first of the four `f32` components.
     #[must_use]
     pub const fn as_ptr(&self) -> *const f32 {
         &raw const self.x
     }
 
-    /// Returns the raw pointer used to drive the `SCNVector4` protocol surface.
+    /// Returns a mutable pointer to the first of the four `f32` components.
     #[must_use]
     pub fn as_mut_ptr(&mut self) -> *mut f32 {
         &raw mut self.x
     }
 }
 
-/// Represents an `SCNMatrix4` value.
+/// Sixteen `f32` elements exchanged with SceneKit's `CGFloat`-based `SCNMatrix4`.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Matrix4 {
-    /// Column-major elements matching the `SCNMatrix4` memory layout.
+    /// Elements in `SCNMatrix4` order (`m11`, `m12`, … `m44`), each converted from `CGFloat`.
     pub elements: [f32; 16],
 }
 
@@ -98,13 +101,13 @@ impl Matrix4 {
         Self { elements }
     }
 
-    /// Returns the Objective-C pointer backing this `SCNMatrix4` wrapper.
+    /// Returns a pointer to the first of the sixteen `f32` elements.
     #[must_use]
     pub const fn as_ptr(&self) -> *const f32 {
         self.elements.as_ptr()
     }
 
-    /// Returns the raw pointer used to drive the `SCNMatrix4` protocol surface.
+    /// Returns a mutable pointer to the first of the sixteen `f32` elements.
     #[must_use]
     pub fn as_mut_ptr(&mut self) -> *mut f32 {
         self.elements.as_mut_ptr()
@@ -127,8 +130,7 @@ impl Default for Matrix4 {
 // accidental field reordering / type change fails the build immediately instead
 // of silently corrupting marshalled data at runtime. The cross-language
 // `scn_verify_ffi_layout` check in `tests/ffi_layout_tests.rs` guards the Swift
-// side's `f32` element size too. (`offset_of!` is intentionally not used: the
-// crate MSRV is 1.76, below the 1.77 that stabilized it.)
+// side's `f32` element size too.
 use core::mem::{align_of, size_of};
 
 const _: () = assert!(size_of::<Vector3>() == 12);

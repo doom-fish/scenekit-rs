@@ -1,28 +1,27 @@
-# SceneKit coverage audit for `scenekit-rs` v0.2.2
+# SceneKit coverage for `scenekit-rs` v0.3.0
 
-`scenekit-rs` v0.2.2 closes the audited non-exempt SceneKit SDK surface for macOS 26.2.
+## What the numbers measure
 
-## Summary
+`COVERAGE_AUDIT.md` and `COVERAGE_AUDIT_V2.md` were generated against the macOS 26.2 SDK and have not been regenerated for 26.5. They list top-level public symbols only: classes, protocols, enums, option sets, structs, exported constants and exported C helpers. A symbol is **VERIFIED** when some Rust item names it, however few of its methods and properties are wrapped. Their "246/246" figure therefore says every non-exempt top-level symbol has a Rust counterpart; it does not say the SceneKit API is fully wrapped. The 9 exemptions are deprecated or OpenGL-only symbols (checked in `COVERAGE_AUDIT_V2.md`).
 
-- `COVERAGE_AUDIT.md` now reports **246/246 non-exempt public symbols wrapped**.
-- The remaining 9 symbols stay explicitly exempt because they are deprecated/OpenGL-only APIs.
-- `SCNSceneRenderer` now includes scene presentation, frustum queries, project/unproject helpers, prepare helpers, SpriteKit overlays/transitions, working color space access, Metal/audio handles, reverse-Z toggles, and delegate getter/setter coverage.
-- Public protocol/delegate bridges now cover actionable, animatable, bounding-volume, technique-support, node-renderer, avoid-occluder, scene-export, and scene-renderer surfaces.
+Apple announced a soft deprecation of SceneKit at WWDC25 (maintenance mode, critical bug fixes only); see the README.
 
-## Newly completed logical areas in v0.2.2
+## Method-level status
 
-| Logical area | Status | Notes |
-| --- | --- | --- |
-| `SCNSceneRenderer` | ✅ complete | Full protocol-level surface plus tests for overlays, projection, frustum queries, export, and delegate bridges. |
-| Advanced geometry / asset pipeline | ✅ complete | `SCNPyramid`, `SCNTube`, `SCNCapsule`, `SCNTorus`, `SCNShape`, `SCNGeometrySource`, `SCNGeometryElement`, `SCNGeometryTessellator`, `SCNLevelOfDetail`, `SCNMorpher`, `SCNReferenceNode`, `SCNSkinner`, and `SCNParticlePropertyController`. |
-| Extended constraints | ✅ complete | `SCNBillboardConstraint`, `SCNTransformConstraint`, `SCNIKConstraint`, `SCNReplicatorConstraint`, `SCNAccelerationConstraint`, `SCNSliderConstraint`, and `SCNAvoidOccluderConstraint`. |
-| Extended physics | ✅ complete | `SCNPhysicsBehavior`, `SCNPhysicsField`, `SCNPhysicsShape`, joints, vehicle/wheel wrappers, physics-world behavior helpers, and node physics-field helpers. |
-| Protocols / delegates / export | ✅ complete | Public Rust bridges for `SCNActionable`, `SCNAnimatable`, `SCNBoundingVolume`, `SCNTechniqueSupport`, `SCNNodeRendererDelegate`, `SCNAvoidOccluderConstraintDelegate`, `SCNSceneExportDelegate`, `SCNTimingFunction`, `SCNAnimationEvent`, and `SCNExportJavaScriptModule`. |
-| Constants / enums / C helpers | ✅ complete | Remaining audited SceneKit enums, option sets, exported constants, and math helpers are now exposed. |
+| Area | Status |
+| --- | --- |
+| Scene graph (`SCNScene`, `SCNNode`) | Construction, transforms, hierarchy (`child_nodes`, `parent`, `child_node_with_name`, `clone_node`), world transform, opacity, category mask, geometry/light/camera/physics attachments. Constraints can be set and counted but not read back. Not wrapped: flattened clones, presentation nodes and filters. |
+| Geometry | Primitive shapes, vertex/normal/texture-coordinate sources, generic `SCNGeometrySource(data:semantic:...)` with layout validation, validated `SCNGeometryElement(data:...)`. Reading sources or elements back from a geometry is not wrapped. |
+| Materials | A subset of material properties (diffuse, normal, specular, emission, ambient, transparent, multiply), colours, images, Metal textures, file URLs, intensity and the lighting model. Most other `SCNMaterial`/`SCNMaterialProperty` properties are not wrapped. |
+| Skinning / morphing | `SCNSkinner` built from validated bone sources; `SCNMorpher` calculation mode only. |
+| Scene loading | `SCNSceneSource` and `SCNScene(url:options:)` with the loading options in `SceneSourceOptions`; entry lookups return identifiers only. |
+| `SCNSceneRenderer` | The protocol's properties and methods for presentation, projection, frustum queries, prepare, overlays, audio and delegates, on `Renderer` and `View`. |
+| Delegates | Node renderer, avoid-occluder, camera controller, program, scene renderer, physics contact and scene export delegates, animation events and custom actions. |
+| Export | `SCNScene.write(to:)` with an export delegate that receives each image; the write result is reported. |
 
 ## Verification
 
 ```bash
-cargo clippy --all-targets -- -D warnings
-cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-features
 ```

@@ -1,5 +1,7 @@
 # scenekit-rs coverage audit v2 (vs MacOSX26.2.sdk)
 
+> **Read this first:** this audit counts top-level symbols from the macOS 26.2 SDK and was not regenerated for 26.5. VERIFIED means a Rust item names the symbol, not that its methods and properties are wrapped; method-level coverage is much thinner (see `COVERAGE.md`). "100%" below refers to that top-level inventory only.
+
 SDK_PUBLIC_SYMBOLS: 255
 VERIFIED: 246
 GAPS: 0
