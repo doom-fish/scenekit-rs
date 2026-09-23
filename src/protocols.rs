@@ -259,7 +259,7 @@ pub trait BoundingVolume: Sealed {
             scn_bounding_volume_get_bounding_sphere(
                 self.bounding_volume_ptr(),
                 center.as_mut_ptr().cast(),
-                &mut radius,
+                &raw mut radius,
             )
         };
         ok.then_some((center, radius))

@@ -31,7 +31,8 @@ impl Technique {
     pub fn float_symbol(&self, key: &str) -> Option<f64> {
         let key = cstring_from_str(key)?;
         let mut value = 0.0_f64;
-        let ok = unsafe { ffi::scn_technique_get_float_symbol(self.ptr, key.as_ptr(), &mut value) };
+        let ok =
+            unsafe { ffi::scn_technique_get_float_symbol(self.ptr, key.as_ptr(), &raw mut value) };
         ok.then_some(value)
     }
 }

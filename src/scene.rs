@@ -28,7 +28,7 @@ impl Scene {
         let path = cstring_from_path(path.as_ref())
             .ok_or_else(|| SceneKitError::new("path contains an interior NUL byte"))?;
         let mut error = core::ptr::null_mut();
-        let ptr = unsafe { ffi::scn_scene_new_url(path.as_ptr(), &mut error) };
+        let ptr = unsafe { ffi::scn_scene_new_url(path.as_ptr(), &raw mut error) };
         if ptr.is_null() {
             Err(unsafe { take_error(error, "SCNScene(url:) returned nil") })
         } else {

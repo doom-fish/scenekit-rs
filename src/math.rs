@@ -26,13 +26,13 @@ impl Vector3 {
     /// Returns the Objective-C pointer backing this `SCNVector3` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *const f32 {
-        &self.x
+        &raw const self.x
     }
 
     /// Returns the raw pointer used to drive the `SCNVector3` protocol surface.
     #[must_use]
     pub fn as_mut_ptr(&mut self) -> *mut f32 {
-        &mut self.x
+        &raw mut self.x
     }
 }
 
@@ -60,13 +60,13 @@ impl Vector4 {
     /// Returns the Objective-C pointer backing this `SCNVector4` wrapper.
     #[must_use]
     pub const fn as_ptr(&self) -> *const f32 {
-        &self.x
+        &raw const self.x
     }
 
     /// Returns the raw pointer used to drive the `SCNVector4` protocol surface.
     #[must_use]
     pub fn as_mut_ptr(&mut self) -> *mut f32 {
-        &mut self.x
+        &raw mut self.x
     }
 }
 

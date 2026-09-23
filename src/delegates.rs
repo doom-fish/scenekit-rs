@@ -262,7 +262,7 @@ extern "C" fn avoid_occluder_should_trampoline(
             .callbacks
             .should_avoid_occluder
             .as_mut()
-            .map_or(true, |callback| {
+            .is_none_or(|callback| {
                 let occluder = unsafe { Node::from_raw_borrowed(occluder) };
                 let node = unsafe { Node::from_raw_borrowed(node) };
                 callback(&occluder, &node)

@@ -183,7 +183,7 @@ impl SceneSource {
         let path = cstring_from_path(path.as_ref())
             .ok_or_else(|| SceneKitError::new("path contains an interior NUL byte"))?;
         let mut error = core::ptr::null_mut();
-        let ptr = unsafe { ffi::scn_scene_source_new_url(path.as_ptr(), &mut error) };
+        let ptr = unsafe { ffi::scn_scene_source_new_url(path.as_ptr(), &raw mut error) };
         if ptr.is_null() {
             Err(unsafe { take_error(error, "SCNSceneSource(url:options:) returned nil") })
         } else {
@@ -195,7 +195,7 @@ impl SceneSource {
     pub fn from_data(data: &[u8]) -> Result<Self, SceneKitError> {
         let mut error = core::ptr::null_mut();
         let ptr =
-            unsafe { ffi::scn_scene_source_new_data(data.as_ptr().cast(), data.len(), &mut error) };
+            unsafe { ffi::scn_scene_source_new_data(data.as_ptr().cast(), data.len(), &raw mut error) };
         if ptr.is_null() {
             Err(unsafe { take_error(error, "SCNSceneSource(data:options:) returned nil") })
         } else {
@@ -212,7 +212,7 @@ impl SceneSource {
     /// Mirrors `SCNSceneSource.scene`.
     pub fn scene(&self) -> Result<Scene, SceneKitError> {
         let mut error = core::ptr::null_mut();
-        let ptr = unsafe { ffi::scn_scene_source_new_scene(self.ptr, &mut error) };
+        let ptr = unsafe { ffi::scn_scene_source_new_scene(self.ptr, &raw mut error) };
         if ptr.is_null() {
             Err(unsafe { take_error(error, "SCNSceneSource.scene(options:error:) returned nil") })
         } else {
