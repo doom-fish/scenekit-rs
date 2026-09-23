@@ -107,10 +107,10 @@ impl Renderer {
             ffi::scn_renderer_render(
                 self.ptr,
                 at_time,
-                viewport.x,
-                viewport.y,
-                viewport.width,
-                viewport.height,
+                viewport.origin.x,
+                viewport.origin.y,
+                viewport.size.width,
+                viewport.size.height,
                 command_buffer.as_ptr(),
                 pass_descriptor.as_ptr(),
             );

@@ -15,12 +15,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("failed to create command queue")?;
     let texture = device
         .new_texture(TextureDescriptor {
-            pixel_format: pixel_format::BGRA8UNORM,
-            width: WIDTH,
-            height: HEIGHT,
-            mipmapped: false,
             usage: texture_usage::RENDER_TARGET | texture_usage::SHADER_READ,
             storage_mode: storage_mode::SHARED,
+            ..TextureDescriptor::new_2d(WIDTH, HEIGHT, pixel_format::BGRA8UNORM)
         })
         .ok_or("failed to allocate render target texture")?;
 
@@ -66,8 +63,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &command_buffer,
         &pass,
     );
-    command_buffer.commit();
-    command_buffer.wait_until_completed();
+    command_buffer.commit()?;
+    command_buffer.wait_until_completed()?;
 
     let pixels = read_texture_bytes(&texture)?;
     assert!(

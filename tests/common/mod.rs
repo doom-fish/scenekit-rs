@@ -38,12 +38,9 @@ pub fn renderer_smoke() -> Result<(), Box<dyn Error>> {
         .ok_or("failed to create command queue")?;
     let texture = device
         .new_texture(TextureDescriptor {
-            pixel_format: pixel_format::BGRA8UNORM,
-            width: 64,
-            height: 64,
-            mipmapped: false,
             usage: texture_usage::RENDER_TARGET | texture_usage::SHADER_READ,
             storage_mode: storage_mode::SHARED,
+            ..TextureDescriptor::new_2d(64, 64, pixel_format::BGRA8UNORM)
         })
         .ok_or("failed to create texture")?;
 
@@ -77,8 +74,8 @@ pub fn renderer_smoke() -> Result<(), Box<dyn Error>> {
         &command_buffer,
         &pass,
     );
-    command_buffer.commit();
-    command_buffer.wait_until_completed();
+    command_buffer.commit()?;
+    command_buffer.wait_until_completed()?;
 
     let pixels = read_texture_bytes(&texture)?;
     assert!(pixels.iter().any(|&byte| byte != 0));

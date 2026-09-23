@@ -16,12 +16,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let queue = device.new_command_queue().expect("no command queue");
     let texture = device
         .new_texture(TextureDescriptor {
-            pixel_format: pixel_format::BGRA8UNORM,
-            width: 256,
-            height: 256,
-            mipmapped: false,
             usage: texture_usage::RENDER_TARGET | texture_usage::SHADER_READ,
             storage_mode: storage_mode::SHARED,
+            ..TextureDescriptor::new_2d(256, 256, pixel_format::BGRA8UNORM)
         })
         .expect("texture");
 
@@ -58,8 +55,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &command_buffer,
         &pass,
     );
-    command_buffer.commit();
-    command_buffer.wait_until_completed();
+    command_buffer.commit()?;
+    command_buffer.wait_until_completed()?;
 
     let pixels = scenekit::read_texture_bytes(&texture)?;
     assert!(pixels.iter().any(|&byte| byte != 0));
