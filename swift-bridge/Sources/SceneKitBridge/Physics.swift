@@ -18,7 +18,7 @@ public func scn_physics_body_kinematic() -> UnsafeMutableRawPointer? {
 @_cdecl("scn_physics_body_get_type")
 public func scn_physics_body_get_type(_ bodyHandle: UnsafeMutableRawPointer?) -> Int32 {
     guard let body: SCNPhysicsBody = scnBorrow(bodyHandle) else { return -1 }
-    return Int32(body.type.rawValue)
+    return Int32(clamping: body.type.rawValue)
 }
 
 @_cdecl("scn_physics_body_set_type")

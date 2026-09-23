@@ -306,7 +306,7 @@ public func scn_morpher_new() -> UnsafeMutableRawPointer? {
 @_cdecl("scn_morpher_get_calculation_mode")
 public func scn_morpher_get_calculation_mode(_ morpherHandle: UnsafeMutableRawPointer?) -> Int32 {
     guard let morpher: SCNMorpher = scnBorrow(morpherHandle) else { return 0 }
-    return Int32(morpher.calculationMode.rawValue)
+    return Int32(clamping: morpher.calculationMode.rawValue)
 }
 
 @_cdecl("scn_morpher_set_calculation_mode")
@@ -337,7 +337,7 @@ public func scn_particle_property_controller_new_with_animation(_ animationHandl
 @_cdecl("scn_particle_property_controller_get_input_mode")
 public func scn_particle_property_controller_get_input_mode(_ controllerHandle: UnsafeMutableRawPointer?) -> Int32 {
     guard let controller: SCNParticlePropertyController = scnBorrow(controllerHandle) else { return 0 }
-    return Int32(controller.inputMode.rawValue)
+    return Int32(clamping: controller.inputMode.rawValue)
 }
 
 @_cdecl("scn_particle_property_controller_set_input_mode")
@@ -356,7 +356,7 @@ public func scn_reference_node_new_url(_ path: UnsafePointer<CChar>?) -> UnsafeM
 @_cdecl("scn_reference_node_get_loading_policy")
 public func scn_reference_node_get_loading_policy(_ nodeHandle: UnsafeMutableRawPointer?) -> Int32 {
     guard let node: SCNReferenceNode = scnBorrow(nodeHandle) else { return 0 }
-    return Int32(node.loadingPolicy.rawValue)
+    return Int32(clamping: node.loadingPolicy.rawValue)
 }
 
 @_cdecl("scn_reference_node_set_loading_policy")

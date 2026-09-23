@@ -77,7 +77,7 @@ public func scn_light_set_intensity(_ lightHandle: UnsafeMutableRawPointer?, _ i
 @_cdecl("scn_light_get_shadow_mode")
 public func scn_light_get_shadow_mode(_ lightHandle: UnsafeMutableRawPointer?) -> Int32 {
     guard let light: SCNLight = scnBorrow(lightHandle) else { return -1 }
-    return Int32(light.shadowMode.rawValue)
+    return Int32(clamping: light.shadowMode.rawValue)
 }
 
 @_cdecl("scn_light_set_shadow_mode")

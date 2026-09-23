@@ -108,13 +108,13 @@ public func scn_slider_constraint_new() -> UnsafeMutableRawPointer? {
 @_cdecl("scn_slider_constraint_get_collision_category_bit_mask")
 public func scn_slider_constraint_get_collision_category_bit_mask(_ constraintHandle: UnsafeMutableRawPointer?) -> UInt {
     guard let constraint: SCNSliderConstraint = scnBorrow(constraintHandle) else { return 0 }
-    return UInt(constraint.collisionCategoryBitMask)
+    return UInt(bitPattern: constraint.collisionCategoryBitMask)
 }
 
 @_cdecl("scn_slider_constraint_set_collision_category_bit_mask")
 public func scn_slider_constraint_set_collision_category_bit_mask(_ constraintHandle: UnsafeMutableRawPointer?, _ mask: UInt) {
     guard let constraint: SCNSliderConstraint = scnBorrow(constraintHandle) else { return }
-    constraint.collisionCategoryBitMask = Int(mask)
+    constraint.collisionCategoryBitMask = Int(bitPattern: mask)
 }
 
 @_cdecl("scn_avoid_occluder_constraint_new")
@@ -139,13 +139,13 @@ public func scn_avoid_occluder_constraint_set_target(_ constraintHandle: UnsafeM
 @_cdecl("scn_avoid_occluder_constraint_get_occluder_category_bit_mask")
 public func scn_avoid_occluder_constraint_get_occluder_category_bit_mask(_ constraintHandle: UnsafeMutableRawPointer?) -> UInt {
     guard let constraint: SCNAvoidOccluderConstraint = scnBorrow(constraintHandle) else { return 0 }
-    return UInt(constraint.occluderCategoryBitMask)
+    return UInt(bitPattern: constraint.occluderCategoryBitMask)
 }
 
 @_cdecl("scn_avoid_occluder_constraint_set_occluder_category_bit_mask")
 public func scn_avoid_occluder_constraint_set_occluder_category_bit_mask(_ constraintHandle: UnsafeMutableRawPointer?, _ mask: UInt) {
     guard let constraint: SCNAvoidOccluderConstraint = scnBorrow(constraintHandle) else { return }
-    constraint.occluderCategoryBitMask = Int(mask)
+    constraint.occluderCategoryBitMask = Int(bitPattern: mask)
 }
 
 @_cdecl("scn_avoid_occluder_constraint_get_bias")

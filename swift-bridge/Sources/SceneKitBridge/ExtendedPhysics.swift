@@ -49,7 +49,7 @@ public func scn_physics_field_linear_gravity() -> UnsafeMutableRawPointer? {
 @_cdecl("scn_physics_field_get_scope")
 public func scn_physics_field_get_scope(_ fieldHandle: UnsafeMutableRawPointer?) -> Int32 {
     guard let field: SCNPhysicsField = scnBorrow(fieldHandle) else { return 0 }
-    return Int32(field.scope.rawValue)
+    return Int32(clamping: field.scope.rawValue)
 }
 
 @_cdecl("scn_physics_field_set_scope")

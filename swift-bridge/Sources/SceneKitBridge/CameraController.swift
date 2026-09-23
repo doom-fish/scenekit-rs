@@ -180,7 +180,7 @@ public func scn_camera_controller_set_point_of_view(_ controllerHandle: UnsafeMu
 @_cdecl("scn_camera_controller_get_interaction_mode")
 public func scn_camera_controller_get_interaction_mode(_ controllerHandle: UnsafeMutableRawPointer?) -> Int32 {
     guard let controller: SCNCameraController = scnBorrow(controllerHandle) else { return -1 }
-    return Int32(controller.interactionMode.rawValue)
+    return Int32(clamping: controller.interactionMode.rawValue)
 }
 
 @_cdecl("scn_camera_controller_set_interaction_mode")

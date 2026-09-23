@@ -165,7 +165,7 @@ public func scn_scene_renderer_set_point_of_view(_ rendererHandle: UnsafeMutable
 @_cdecl("scn_scene_renderer_hit_test")
 public func scn_scene_renderer_hit_test(_ rendererHandle: UnsafeMutableRawPointer?, _ x: Double, _ y: Double) -> UnsafeMutableRawPointer? {
     guard let renderer = scnBorrowSceneRenderer(rendererHandle) else { return nil }
-    return scnRetain(renderer.hitTest(CGPoint(x: x, y: y), options: nil) as NSArray)
+    return scnRetain(SceneHitTestResultsBox(results: renderer.hitTest(CGPoint(x: x, y: y), options: nil)))
 }
 
 @_cdecl("scn_scene_renderer_is_node_inside_frustum")
@@ -296,7 +296,7 @@ public func scn_scene_renderer_set_debug_options(_ rendererHandle: UnsafeMutable
 @_cdecl("scn_scene_renderer_get_rendering_api")
 public func scn_scene_renderer_get_rendering_api(_ rendererHandle: UnsafeMutableRawPointer?) -> Int32 {
     guard let renderer = scnBorrowSceneRenderer(rendererHandle) else { return -1 }
-    return Int32(renderer.renderingAPI.rawValue)
+    return Int32(clamping: renderer.renderingAPI.rawValue)
 }
 
 @_cdecl("scn_scene_renderer_get_delegate")
@@ -370,19 +370,19 @@ public func scn_scene_renderer_get_device(_ rendererHandle: UnsafeMutableRawPoin
 @_cdecl("scn_scene_renderer_get_color_pixel_format")
 public func scn_scene_renderer_get_color_pixel_format(_ rendererHandle: UnsafeMutableRawPointer?) -> Int {
     guard let renderer = scnBorrowSceneRenderer(rendererHandle) else { return 0 }
-    return Int(renderer.colorPixelFormat.rawValue)
+    return Int(clamping: renderer.colorPixelFormat.rawValue)
 }
 
 @_cdecl("scn_scene_renderer_get_depth_pixel_format")
 public func scn_scene_renderer_get_depth_pixel_format(_ rendererHandle: UnsafeMutableRawPointer?) -> Int {
     guard let renderer = scnBorrowSceneRenderer(rendererHandle) else { return 0 }
-    return Int(renderer.depthPixelFormat.rawValue)
+    return Int(clamping: renderer.depthPixelFormat.rawValue)
 }
 
 @_cdecl("scn_scene_renderer_get_stencil_pixel_format")
 public func scn_scene_renderer_get_stencil_pixel_format(_ rendererHandle: UnsafeMutableRawPointer?) -> Int {
     guard let renderer = scnBorrowSceneRenderer(rendererHandle) else { return 0 }
-    return Int(renderer.stencilPixelFormat.rawValue)
+    return Int(clamping: renderer.stencilPixelFormat.rawValue)
 }
 
 @_cdecl("scn_scene_renderer_get_command_queue")
