@@ -6,6 +6,15 @@ Safe Rust bindings for Apple's [SceneKit](https://developer.apple.com/documentat
 
 > **Coverage:** `COVERAGE_AUDIT.md` counts top-level SDK symbols (classes, protocols, enums, constants, C helpers): 246 of the 255 on the macOS 26.2 SDK are named by a Rust item. A symbol counts as covered even when only a few of its methods and properties are wrapped, so method-level coverage is much thinner than that figure suggests.
 
+## Installation
+
+```toml
+[dependencies]
+scenekit-rs = "0.3"
+```
+
+The library is imported as `scenekit`. It needs macOS 11 or later, Rust 1.82 or later, and the Xcode command-line tools (the build compiles a Swift bridge).
+
 ## Quick start
 
 ```rust,no_run
