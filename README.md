@@ -73,22 +73,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 - `View` (`SCNView`) is an `NSView`: `View::new` returns an error off the main thread, and the view's bridge calls do nothing there. `View` is neither `Send` nor `Sync`.
 - SceneKit calls renderer, node-renderer, physics, avoid-occluder, program and animation callbacks on its rendering thread, so every callback closure must be `Send`. Each delegate's closures sit behind a mutex; a callback that re-enters its own delegate on the same thread is skipped instead of deadlocking.
-- `SCNNode.rendererDelegate`, `SCNAvoidOccluderConstraint.delegate`, `SCNCameraController.delegate` and `SCNProgram.delegate` are unretained (`assign`) in the SDK. The node, constraint, controller or program keeps the delegate object alive while it is set (clones made with `Node::clone_node` do too), so SceneKit never messages freed memory. Dropping the Rust delegate handle deactivates its callbacks; setting the property to `None` releases them.
+- `SCNNode.rendererDelegate`, `SCNAvoidOccluderConstraint.delegate`, `SCNCameraController.delegate` and `SCNProgram.delegate` are unretained (`assign`) in the SDK, and SceneKit loads them on its rendering thread without retaining them. A delegate that another thread clears or replaces can therefore still be in use by a frame in flight, and SceneKit offers no way to wait for that frame. The node, constraint, controller or program therefore keeps every delegate object that was set on it alive until the owner itself is freed (clones made with `Node::clone_node` keep the delegates they copied). SceneKit stops calling a node's renderer delegate before the node is freed. Dropping the Rust delegate handle deactivates its callbacks at once; the small bridge object and the closure are freed with the owner, so replacing delegates many times on one long-lived owner holds one of them per delegate.
 - `SceneRendererDelegate` and `PhysicsContactDelegate` are held weakly by SceneKit and stop when their handle is dropped.
 - Node and renderer arguments are borrowed for the duration of a callback and are not retained per call.
+- SceneKit applies delegate, buffer-binding and scene-graph changes through implicit `SCNTransaction`s that are committed by a running run loop. On a thread whose run loop does not run (a plain thread or a test driving an offline `Renderer`), call `Transaction::flush()` after such changes so the next frame sees them and SceneKit releases the objects the transaction holds.
+- SceneKit never calls `SCNAvoidOccluderConstraintDelegate.didAvoidOccluder`, and it reports `SCNProgramDelegate` errors only from its OpenGL renderer, so those two callbacks do not run with the Metal renderers this crate creates.
+
+## Offline rendering
+
+- `Renderer::render` takes a `CommandQueue`, encodes the frame into a new command buffer and returns it uncommitted, so no other encoder or thread can use that buffer while SceneKit encodes. Add more work to it if needed, then commit it; `commit` and `wait_until_completed` report GPU errors.
+- `Renderer::render_into` encodes into an existing command buffer and is `unsafe`: the buffer must have no active encoder and no other thread may commit it or encode into it during the call, because Metal aborts the process in both cases. It returns an error for a buffer that was already committed or failed.
+- `render` and `render_into` return an error instead of letting SceneKit abort when temporal antialiasing and jittering are both enabled (SceneKit cannot create its history texture for an offline renderer), and when the command buffer, the renderer and the render target belong to different Metal devices.
 
 ## Validation
 
 - `GeometryElement::with_data` accepts 1-, 2- or 4-byte indices only, and the data length must equal the index count implied by the primitive type and count (polygon data starts with one vertex count, of at least 3, per polygon). `Geometry::with_sources_elements` rejects indices at or beyond the vector count of the smallest source.
 - `GeometrySource::with_data` checks the layout (1–4 components, float components of 4 or 8 bytes, integer components of 1, 2 or 4 bytes, stride and offset) against the data length.
 - `Skinner::new` checks that bone weights and indices describe the base geometry's vertices and that every bone index is below the bone count. SceneKit needs inverse bind transforms; when none are given, each bone's current world transform is inverted.
+- `BufferStream::write_bytes` (in a `ProgramBufferBinding` callback) checks the length against the size Metal reflection reports for the named buffer argument of the program's vertex and fragment functions (`MTLLibrary` function reflection on macOS 26 and later, a reflection pipeline before that), and rejects empty writes and writes the Metal device could not allocate. SceneKit copies each write into a new buffer and binds it, so a later write replaces an earlier one: write the whole argument at once. When a callback makes no valid write, or its binding was dropped or removed, the argument is bound as zeros instead of whatever the GPU finds. `BufferStream::required_length` and `maximum_length` report the limits, and the `unsafe` `write_bytes_unchecked` skips the size check for programs Metal cannot reflect. Give the program its shaders with `Program::set_library`.
 - `read_texture_bytes` sizes its buffer from the pixel format (for example 8 bytes per pixel for `RGBA16Float` and `BGRA10_XR`) and rejects compressed, depth, stencil and framebuffer-only textures, textures that are not 2D, and private or memoryless storage. A managed texture must be synchronized before its bytes are current.
 
 ## Highlights
 
 - Scene graph construction with `Scene`, `Node`, `Camera`, `Light`, `Geometry`, and `Material`, including node hierarchy queries, clones, world transforms, opacity and category masks
 - Animation and action playback through `Animation`, `AnimationPlayer`, and `Action`, including `Action::custom`
-- Physics, constraints, particles, audio, morpher/skinner, and reference-node helpers across `Node`, `Scene`, and `PhysicsWorld`
+- Physics, constraints, particles, audio, morpher/skinner, and reference-node helpers across `Node`, `Scene`, and `PhysicsWorld`, including physics-body category, collision and contact-test masks (SceneKit reports no contacts until a contact-test mask is set)
 - `SCNSceneRenderer` protocol methods for presentation, frustum queries, project/unproject, prepare helpers, overlays, audio listener, reverse-Z, and delegates
 - Custom geometry from raw vertex, normal, colour, tangent, crease and bone data
 - Scene loading options (`SceneSourceOptions`) for `SceneSource` and `Scene::from_url_with_options`
@@ -97,7 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Examples and tests
 
-The crate ships with 20 numbered examples and 27 integration test files. `tests/main_thread.rs` uses its own harness so that its `SCNView` tests run on the main thread. To run the full verification suite:
+The crate ships with 20 numbered examples and 29 integration test files. `tests/main_thread.rs` uses its own harness so that its `SCNView` and camera-inertia tests run on the main thread. The Swift bridge exports no test-only entry points: the tests drive SceneKit for real (offline renders, physics simulation, camera inertia) and message a delegate directly only for the two callbacks SceneKit never sends. To run the full verification suite:
 
 ```bash
 cargo clippy --all-targets -- -D warnings

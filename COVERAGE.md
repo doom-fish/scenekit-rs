@@ -16,7 +16,10 @@ Apple announced a soft deprecation of SceneKit at WWDC25 (maintenance mode, crit
 | Skinning / morphing | `SCNSkinner` built from validated bone sources; `SCNMorpher` calculation mode only. |
 | Scene loading | `SCNSceneSource` and `SCNScene(url:options:)` with the loading options in `SceneSourceOptions`; entry lookups return identifiers only. |
 | `SCNSceneRenderer` | The protocol's properties and methods for presentation, projection, frustum queries, prepare, overlays, audio and delegates, on `Renderer` and `View`. |
-| Delegates | Node renderer, avoid-occluder, camera controller, program, scene renderer, physics contact and scene export delegates, animation events and custom actions. |
+| Delegates | Node renderer, avoid-occluder, camera controller, program, scene renderer, physics contact and scene export delegates, animation events and custom actions. SceneKit never sends `didAvoidOccluder` and sends program errors only from its OpenGL renderer, so those two callbacks do not run with this crate's Metal renderers. |
+| Programs | `SCNProgram` source and Metal function names, `library` (set only), semantics, opacity, delegate and buffer bindings; buffer writes are checked against Metal's reflection of the named argument. |
+| Physics | Static, dynamic and kinematic bodies with mass, restitution, friction, forces and category, collision and contact-test masks; physics world gravity, speed, time step, contact tests and the contact delegate; joints, fields and vehicles. |
+| Offline rendering | `Renderer::render` into a new command buffer and the `unsafe` `render_into` for an existing one, both returning errors instead of aborting; `read_texture_bytes`. |
 | Export | `SCNScene.write(to:)` with an export delegate that receives each image; the write result is reported. |
 
 ## Verification

@@ -13,9 +13,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SCNCameraController.delegate` and `SCNProgram.delegate` are unretained
   (`assign`) in the SDK, and the setters did not retain the delegate. Dropping
   the Rust delegate while it was set left SceneKit messaging a freed object that
-  then called into freed Rust state. The owner now retains the delegate object
-  while it is set (clones made with `Node::clone_node` too, because SceneKit
-  copies the unretained pointer into clones); setting `None` releases it.
+  then called into freed Rust state. SceneKit also loads these pointers on its
+  rendering thread without retaining them, so releasing a delegate as soon as
+  another thread cleared or replaced it freed it under a frame in flight
+  (`tests/delegate_race_tests.rs` crashed every run). The owner now keeps every
+  delegate object that was set on it until the owner itself is freed (clones
+  made with `Node::clone_node` keep the delegates SceneKit copied into them);
+  SceneKit detaches a node's renderer delegate before it frees the node.
+- `BufferStream::write_bytes` passed any length to SceneKit, which copies each
+  write into a new buffer and binds it: a write shorter than the shader's
+  buffer argument, an argument written in pieces (only the last piece stays
+  bound) or no write at all left the GPU reading past the written bytes, and a
+  write the Metal device cannot allocate made SceneKit loop forever. Writes are
+  now checked against the argument size from Metal reflection and against the
+  device limit, and an argument without a valid write is bound as zeros.
+- `Renderer::render` encoded into whatever command buffer it was given. Metal
+  aborts the process when SceneKit encodes into a committed command buffer or
+  one with an active encoder, and SceneKit aborted when temporal antialiasing
+  and jittering were both enabled. See Changed.
 - `read_texture_bytes` assumed 4 bytes per pixel and never told Swift how large
   its buffer was, so reading an `RGBA16Float`, `RGBA32Float` or `BGRA10_XR`
   texture overflowed the heap. The buffer is now sized with
@@ -62,6 +77,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `Renderer::render(at_time, viewport, &CommandQueue, &RenderPassDescriptor)`
+  encodes the frame into a new command buffer and returns it uncommitted as
+  `Result<CommandBuffer, SceneKitError>`, so nothing else can use the buffer
+  while SceneKit encodes. The `unsafe` `Renderer::render_into` encodes into an
+  existing command buffer. Both return errors for committed or failed command
+  buffers, for mismatched Metal devices, and for temporal antialiasing combined
+  with jittering, instead of aborting.
+- **Breaking:** `BufferStream::write_bytes` returns `Result<(), SceneKitError>`
+  and rejects empty writes, writes shorter than the shader's buffer argument
+  and writes the Metal device cannot allocate.
+- **Breaking:** clearing or replacing an unretained delegate no longer frees its
+  closures; they are freed with the node, constraint, camera controller or
+  program. Dropping the Rust delegate handle still deactivates them at once.
+- **Breaking:** the raw `ffi::scn_renderer_render` and
+  `ffi::scn_buffer_stream_write_bytes` declarations take an error out-pointer
+  (and a `checked` flag) and return `bool`.
 - **Breaking:** delegate and callback closures must be `Send`
   (`NodeRendererDelegateCallbacks`, `AvoidOccluderConstraintDelegateCallbacks`,
   `SceneRendererDelegateCallbacks`, `PhysicsContactDelegateCallbacks`,
@@ -107,13 +138,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Material::lighting_model` and `set_lighting_model`.
 - `CameraController::new`, `CameraController::delegate` and
   `Program::delegate`.
+- `Renderer::render_into`, `BufferStream::write_bytes_unchecked`,
+  `BufferStream::required_length`, `BufferStream::maximum_length` and
+  `Program::set_library`.
+- `PhysicsBody::category_bit_mask`, `collision_bit_mask` and
+  `contact_test_bit_mask` with their setters. SceneKit reports no contacts
+  until a contact-test mask is set, so the contact delegate was unreachable.
+- Tests that render real frames for buffer bindings (short, split, oversized,
+  empty and missing writes), command-buffer states, node and scene renderer
+  delegates, avoid-occluder constraints and physics contacts, a main-thread
+  camera-inertia test, and a stress test that clears renderer delegates on one
+  thread while another renders.
 
 ### Removed
 
 - **Breaking:** the test-only hooks `Node::test_invoke_renderer_delegate`,
   `AvoidOccluderConstraint::test_invoke_should_avoid_occluder`,
   `test_invoke_did_avoid_occluder` and the `ffi::*_test_invoke_*`
-  declarations. The tests declare the bridge symbols they need.
+  declarations, and the thirteen `scn_*_test_invoke_*` C symbols the Swift
+  bridge exported to every binary that linked it. The tests drive SceneKit
+  instead, and message a delegate directly only for the two callbacks SceneKit
+  never sends (`didAvoidOccluder`, and program errors outside OpenGL).
 
 ## [0.2.9] - 2026-06-06
 
