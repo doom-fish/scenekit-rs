@@ -90,6 +90,33 @@ impl PhysicsBody {
         unsafe { ffi::scn_physics_body_set_friction(self.ptr, friction) };
     }
 
+    #[must_use]
+    pub fn category_bit_mask(&self) -> usize {
+        unsafe { ffi::scn_physics_body_get_category_bit_mask(self.ptr) }
+    }
+
+    pub fn set_category_bit_mask(&self, mask: usize) {
+        unsafe { ffi::scn_physics_body_set_category_bit_mask(self.ptr, mask) };
+    }
+
+    #[must_use]
+    pub fn collision_bit_mask(&self) -> usize {
+        unsafe { ffi::scn_physics_body_get_collision_bit_mask(self.ptr) }
+    }
+
+    pub fn set_collision_bit_mask(&self, mask: usize) {
+        unsafe { ffi::scn_physics_body_set_collision_bit_mask(self.ptr, mask) };
+    }
+
+    #[must_use]
+    pub fn contact_test_bit_mask(&self) -> usize {
+        unsafe { ffi::scn_physics_body_get_contact_test_bit_mask(self.ptr) }
+    }
+
+    pub fn set_contact_test_bit_mask(&self, mask: usize) {
+        unsafe { ffi::scn_physics_body_set_contact_test_bit_mask(self.ptr, mask) };
+    }
+
     /// Mirrors `SCNPhysicsBody.applyForce`.
     pub fn apply_force(&self, force: Vector3, impulse: bool) {
         unsafe { ffi::scn_physics_body_apply_force(self.ptr, force.x, force.y, force.z, impulse) };

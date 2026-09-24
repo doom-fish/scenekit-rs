@@ -171,6 +171,12 @@ extern "C" {
     pub fn scn_physics_body_set_restitution(body: *mut c_void, restitution: f64);
     pub fn scn_physics_body_get_friction(body: *mut c_void) -> f64;
     pub fn scn_physics_body_set_friction(body: *mut c_void, friction: f64);
+    pub fn scn_physics_body_get_category_bit_mask(body: *mut c_void) -> usize;
+    pub fn scn_physics_body_set_category_bit_mask(body: *mut c_void, mask: usize);
+    pub fn scn_physics_body_get_collision_bit_mask(body: *mut c_void) -> usize;
+    pub fn scn_physics_body_set_collision_bit_mask(body: *mut c_void, mask: usize);
+    pub fn scn_physics_body_get_contact_test_bit_mask(body: *mut c_void) -> usize;
+    pub fn scn_physics_body_set_contact_test_bit_mask(body: *mut c_void, mask: usize);
     pub fn scn_physics_body_apply_force(body: *mut c_void, x: f32, y: f32, z: f32, impulse: bool);
 
     pub fn scn_render_pass_descriptor_new_for_texture(

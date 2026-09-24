@@ -63,6 +63,42 @@ public func scn_physics_body_set_friction(_ bodyHandle: UnsafeMutableRawPointer?
     body.friction = friction
 }
 
+@_cdecl("scn_physics_body_get_category_bit_mask")
+public func scn_physics_body_get_category_bit_mask(_ bodyHandle: UnsafeMutableRawPointer?) -> UInt {
+    guard let body: SCNPhysicsBody = scnBorrow(bodyHandle) else { return 0 }
+    return UInt(bitPattern: body.categoryBitMask)
+}
+
+@_cdecl("scn_physics_body_set_category_bit_mask")
+public func scn_physics_body_set_category_bit_mask(_ bodyHandle: UnsafeMutableRawPointer?, _ mask: UInt) {
+    guard let body: SCNPhysicsBody = scnBorrow(bodyHandle) else { return }
+    body.categoryBitMask = Int(bitPattern: mask)
+}
+
+@_cdecl("scn_physics_body_get_collision_bit_mask")
+public func scn_physics_body_get_collision_bit_mask(_ bodyHandle: UnsafeMutableRawPointer?) -> UInt {
+    guard let body: SCNPhysicsBody = scnBorrow(bodyHandle) else { return 0 }
+    return UInt(bitPattern: body.collisionBitMask)
+}
+
+@_cdecl("scn_physics_body_set_collision_bit_mask")
+public func scn_physics_body_set_collision_bit_mask(_ bodyHandle: UnsafeMutableRawPointer?, _ mask: UInt) {
+    guard let body: SCNPhysicsBody = scnBorrow(bodyHandle) else { return }
+    body.collisionBitMask = Int(bitPattern: mask)
+}
+
+@_cdecl("scn_physics_body_get_contact_test_bit_mask")
+public func scn_physics_body_get_contact_test_bit_mask(_ bodyHandle: UnsafeMutableRawPointer?) -> UInt {
+    guard let body: SCNPhysicsBody = scnBorrow(bodyHandle) else { return 0 }
+    return UInt(bitPattern: body.contactTestBitMask)
+}
+
+@_cdecl("scn_physics_body_set_contact_test_bit_mask")
+public func scn_physics_body_set_contact_test_bit_mask(_ bodyHandle: UnsafeMutableRawPointer?, _ mask: UInt) {
+    guard let body: SCNPhysicsBody = scnBorrow(bodyHandle) else { return }
+    body.contactTestBitMask = Int(bitPattern: mask)
+}
+
 @_cdecl("scn_physics_body_apply_force")
 public func scn_physics_body_apply_force(
     _ bodyHandle: UnsafeMutableRawPointer?,
