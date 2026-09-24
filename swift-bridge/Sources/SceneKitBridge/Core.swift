@@ -26,16 +26,25 @@ func scnBorrow<T>(_ handle: UnsafeMutableRawPointer?) -> T? {
     return Unmanaged<AnyObject>.fromOpaque(handle).takeUnretainedValue() as? T
 }
 
-func scnRetainDelegate(_ delegate: AnyObject?, by owner: AnyObject, key: UnsafeRawPointer, assign: () -> Void) {
-    let previous = objc_getAssociatedObject(owner, key)
-    objc_setAssociatedObject(owner, key, delegate, .OBJC_ASSOCIATION_RETAIN)
-    assign()
-    withExtendedLifetime(previous) {}
+private let scnDelegateKeeperLock = NSLock()
+private var scnDelegateKeeperKey: UInt8 = 0
+
+private final class ScnDelegateKeeper: NSObject {
+    var delegates: [ObjectIdentifier: AnyObject] = [:]
 }
 
-func scnRetainedDelegate(of owner: AnyObject, key: UnsafeRawPointer) -> UnsafeMutableRawPointer? {
-    guard let delegate = objc_getAssociatedObject(owner, key) as AnyObject? else { return nil }
-    return scnRetain(delegate)
+func scnKeepDelegate(_ delegate: AnyObject?, by owner: AnyObject) {
+    guard let delegate else { return }
+    scnDelegateKeeperLock.lock()
+    defer { scnDelegateKeeperLock.unlock() }
+    let keeper: ScnDelegateKeeper
+    if let existing = objc_getAssociatedObject(owner, &scnDelegateKeeperKey) as? ScnDelegateKeeper {
+        keeper = existing
+    } else {
+        keeper = ScnDelegateKeeper()
+        objc_setAssociatedObject(owner, &scnDelegateKeeperKey, keeper, .OBJC_ASSOCIATION_RETAIN)
+    }
+    keeper.delegates[ObjectIdentifier(delegate)] = delegate
 }
 
 func scnBorrowView(_ handle: UnsafeMutableRawPointer?) -> SCNView? {

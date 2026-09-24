@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use std::error::Error;
-use std::ffi::{c_char, c_void};
+use std::ffi::{c_char, c_void, CStr};
 use std::path::Path;
 
 use apple_cf::cg::CGRect;
@@ -50,9 +50,122 @@ extern "C" {
     pub fn scn_physics_world_test_invoke_delegate_did_end(world: *mut c_void);
 
     fn objc_msgSend();
+    fn objc_getClass(name: *const c_char) -> *mut c_void;
     fn sel_registerName(name: *const c_char) -> *mut c_void;
     fn objc_autoreleasePoolPush() -> *mut c_void;
     fn objc_autoreleasePoolPop(pool: *mut c_void);
+}
+
+fn selector(name: &CStr) -> *mut c_void {
+    unsafe { sel_registerName(name.as_ptr()) }
+}
+
+pub fn send_object(receiver: *mut c_void, name: &CStr) -> *mut c_void {
+    let send = unsafe {
+        std::mem::transmute::<
+            unsafe extern "C" fn(),
+            unsafe extern "C" fn(*mut c_void, *mut c_void) -> *mut c_void,
+        >(objc_msgSend)
+    };
+    unsafe { send(receiver, selector(name)) }
+}
+
+pub fn send_with_object(receiver: *mut c_void, name: &CStr, argument: *mut c_void) {
+    let send = unsafe {
+        std::mem::transmute::<
+            unsafe extern "C" fn(),
+            unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void),
+        >(objc_msgSend)
+    };
+    unsafe { send(receiver, selector(name), argument) };
+}
+
+pub fn send_with_two_objects(
+    receiver: *mut c_void,
+    name: &CStr,
+    first: *mut c_void,
+    second: *mut c_void,
+) {
+    let send = unsafe {
+        std::mem::transmute::<
+            unsafe extern "C" fn(),
+            unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, *mut c_void),
+        >(objc_msgSend)
+    };
+    unsafe { send(receiver, selector(name), first, second) };
+}
+
+pub fn send_with_three_objects(
+    receiver: *mut c_void,
+    name: &CStr,
+    first: *mut c_void,
+    second: *mut c_void,
+    third: *mut c_void,
+) -> bool {
+    let send = unsafe {
+        std::mem::transmute::<
+            unsafe extern "C" fn(),
+            unsafe extern "C" fn(
+                *mut c_void,
+                *mut c_void,
+                *mut c_void,
+                *mut c_void,
+                *mut c_void,
+            ) -> bool,
+        >(objc_msgSend)
+    };
+    unsafe { send(receiver, selector(name), first, second, third) }
+}
+
+pub fn send_void_with_three_objects(
+    receiver: *mut c_void,
+    name: &CStr,
+    first: *mut c_void,
+    second: *mut c_void,
+    third: *mut c_void,
+) {
+    let send = unsafe {
+        std::mem::transmute::<
+            unsafe extern "C" fn(),
+            unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, *mut c_void, *mut c_void),
+        >(objc_msgSend)
+    };
+    unsafe { send(receiver, selector(name), first, second, third) };
+}
+
+pub fn ns_error(domain: &CStr) -> *mut c_void {
+    let string_with_utf8 = unsafe {
+        std::mem::transmute::<
+            unsafe extern "C" fn(),
+            unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_char) -> *mut c_void,
+        >(objc_msgSend)
+    };
+    let error_with_domain = unsafe {
+        std::mem::transmute::<
+            unsafe extern "C" fn(),
+            unsafe extern "C" fn(
+                *mut c_void,
+                *mut c_void,
+                *mut c_void,
+                isize,
+                *mut c_void,
+            ) -> *mut c_void,
+        >(objc_msgSend)
+    };
+    unsafe {
+        let domain = string_with_utf8(
+            objc_getClass(c"NSString".as_ptr()),
+            selector(c"stringWithUTF8String:"),
+            domain.as_ptr(),
+        );
+        error_with_domain(
+            objc_getClass(c"NSError".as_ptr()),
+            selector(c"errorWithDomain:code:userInfo:"),
+            domain,
+            -1,
+            std::ptr::null_mut(),
+        )
+    }
 }
 
 pub fn autoreleasepool<R>(body: impl FnOnce() -> R) -> R {

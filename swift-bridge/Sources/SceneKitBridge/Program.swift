@@ -116,8 +116,6 @@ private func programBindingStore(for program: SCNProgram) -> ProgramBindingStore
     return store
 }
 
-private var programDelegateKey: UInt8 = 0
-
 private final class ProgramDelegateBox: NSObject, SCNProgramDelegate {
     let context: UnsafeMutableRawPointer
     let releaseContext: ScnReleaseContextCallback
@@ -327,15 +325,16 @@ public func scn_program_copy_semantic_for_symbol(_ programHandle: UnsafeMutableR
 public func scn_program_set_delegate(_ programHandle: UnsafeMutableRawPointer?, _ delegateHandle: UnsafeMutableRawPointer?) {
     guard let program: SCNProgram = scnBorrow(programHandle) else { return }
     let delegate: ProgramDelegateBox? = scnBorrow(delegateHandle)
-    scnRetainDelegate(delegate, by: program, key: &programDelegateKey) {
-        program.delegate = delegate
-    }
+    scnKeepDelegate(delegate, by: program)
+    program.delegate = delegate
 }
 
 @_cdecl("scn_program_get_delegate")
 public func scn_program_get_delegate(_ programHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let program: SCNProgram = scnBorrow(programHandle) else { return nil }
-    return scnRetainedDelegate(of: program, key: &programDelegateKey)
+    guard let program: SCNProgram = scnBorrow(programHandle),
+          let delegate = program.delegate as? ProgramDelegateBox
+    else { return nil }
+    return scnRetain(delegate)
 }
 
 @_cdecl("scn_program_set_buffer_binding")

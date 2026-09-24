@@ -10,8 +10,6 @@ private func scnBorrowCameraControlConfiguration(
     return object as? (NSObjectProtocol & SCNCameraControlConfiguration)
 }
 
-private var cameraControllerDelegateKey: UInt8 = 0
-
 private final class CameraControllerDelegateBox: NSObject, SCNCameraControllerDelegate {
     let context: UnsafeMutableRawPointer
     let releaseContext: ScnReleaseContextCallback
@@ -152,15 +150,16 @@ public func scn_camera_control_configuration_set_rotation_sensitivity(_ configur
 public func scn_camera_controller_set_delegate(_ controllerHandle: UnsafeMutableRawPointer?, _ delegateHandle: UnsafeMutableRawPointer?) {
     guard let controller: SCNCameraController = scnBorrow(controllerHandle) else { return }
     let delegate: CameraControllerDelegateBox? = scnBorrow(delegateHandle)
-    scnRetainDelegate(delegate, by: controller, key: &cameraControllerDelegateKey) {
-        controller.delegate = delegate
-    }
+    scnKeepDelegate(delegate, by: controller)
+    controller.delegate = delegate
 }
 
 @_cdecl("scn_camera_controller_get_delegate")
 public func scn_camera_controller_get_delegate(_ controllerHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let controller: SCNCameraController = scnBorrow(controllerHandle) else { return nil }
-    return scnRetainedDelegate(of: controller, key: &cameraControllerDelegateKey)
+    guard let controller: SCNCameraController = scnBorrow(controllerHandle),
+          let delegate = controller.delegate as? CameraControllerDelegateBox
+    else { return nil }
+    return scnRetain(delegate)
 }
 
 @_cdecl("scn_camera_controller_get_point_of_view")

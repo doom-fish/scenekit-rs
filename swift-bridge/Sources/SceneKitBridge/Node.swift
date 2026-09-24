@@ -209,7 +209,7 @@ public func scn_node_child_node_with_name(
 public func scn_node_clone(_ nodeHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
     guard let node: SCNNode = scnBorrow(nodeHandle) else { return nil }
     let clone = node.clone()
-    scnAdoptRendererDelegates(from: node, to: clone)
+    scnKeepRendererDelegates(of: clone)
     return scnRetain(clone)
 }
 

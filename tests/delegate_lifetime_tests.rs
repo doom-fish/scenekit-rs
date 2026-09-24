@@ -1,4 +1,3 @@
-use std::ffi::CString;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -8,7 +7,7 @@ use scenekit::{
     AvoidOccluderConstraintDelegateCallbacks, CameraController, CameraControllerDelegate,
     CameraControllerDelegateCallbacks, Geometry, Node, NodeRendererDelegate,
     NodeRendererDelegateCallbacks, Program, ProgramDelegate, Renderer, SceneRenderer,
-    SceneRendererDelegate, SceneRendererDelegateCallbacks,
+    SceneRendererDelegate, SceneRendererDelegateCallbacks, Transaction,
 };
 
 mod common;
@@ -21,22 +20,23 @@ fn counting_renderer_delegate(calls: &Arc<AtomicUsize>) -> NodeRendererDelegate 
     .expect("node renderer delegate")
 }
 
-fn invoke_render(node: &Node, renderer: &Renderer) {
-    unsafe { common::scn_node_test_invoke_renderer_delegate(node.as_ptr(), renderer.as_ptr()) };
-}
-
 #[test]
-fn node_keeps_its_renderer_delegate_alive_after_the_handle_is_dropped() {
+fn node_keeps_its_renderer_delegate_until_the_node_is_freed() {
     let device = MetalDevice::system_default().expect("device");
-    let renderer = Renderer::new(Some(&device)).expect("renderer");
-    let node = Node::new().expect("node");
+    let texture = common::render_target(&device, 16, pixel_format::BGRA8UNORM).expect("texture");
     let calls = Arc::new(AtomicUsize::new(0));
 
     common::autoreleasepool(|| {
+        let (scene, cube_node, camera_node) = common::green_cube_scene().expect("scene");
+        let renderer = Renderer::new(Some(&device)).expect("renderer");
+        renderer.set_scene(Some(&scene));
+        renderer.set_point_of_view(Some(&camera_node));
         let delegate = counting_renderer_delegate(&calls);
-        node.set_renderer_delegate(Some(&delegate));
-        invoke_render(&node, &renderer);
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        cube_node.set_renderer_delegate(Some(&delegate));
+        Transaction::flush();
+        common::render_frame(&device, &renderer, &texture, 0.0).expect("render");
+        let calls_seen = calls.load(Ordering::SeqCst);
+        assert!(calls_seen >= 1, "a real render calls the delegate");
 
         drop(delegate);
         assert_eq!(
@@ -44,69 +44,116 @@ fn node_keeps_its_renderer_delegate_alive_after_the_handle_is_dropped() {
             2,
             "the node still owns the callbacks"
         );
-        assert!(node.renderer_delegate().is_some());
-        for _ in 0..3 {
-            invoke_render(&node, &renderer);
-        }
+        assert!(cube_node.renderer_delegate().is_some());
+        common::render_frame(&device, &renderer, &texture, 0.1).expect("render");
         assert_eq!(
             calls.load(Ordering::SeqCst),
-            1,
+            calls_seen,
             "a delegate whose handle was dropped no longer runs"
         );
 
-        node.set_renderer_delegate(None);
-        assert!(node.renderer_delegate().is_none());
-        invoke_render(&node, &renderer);
+        cube_node.set_renderer_delegate(None);
+        assert!(cube_node.renderer_delegate().is_none());
+        assert_eq!(
+            Arc::strong_count(&calls),
+            2,
+            "a cleared delegate stays alive while SceneKit may still be using it"
+        );
+        common::render_frame(&device, &renderer, &texture, 0.2).expect("render");
+        assert_eq!(calls.load(Ordering::SeqCst), calls_seen);
+        Transaction::flush();
     });
     assert_eq!(
         Arc::strong_count(&calls),
         1,
-        "clearing the delegate frees its callbacks"
+        "freeing the node frees the callbacks"
     );
 }
 
 #[test]
-fn replacing_a_renderer_delegate_releases_the_previous_one() {
-    let device = MetalDevice::system_default().expect("device");
-    let renderer = Renderer::new(Some(&device)).expect("renderer");
-    let node = Node::new().expect("node");
+fn replacing_a_renderer_delegate_keeps_the_previous_one_until_the_node_is_freed() {
     let first_calls = Arc::new(AtomicUsize::new(0));
     let second_calls = Arc::new(AtomicUsize::new(0));
 
-    let second = common::autoreleasepool(|| {
+    common::autoreleasepool(|| {
+        let node = Node::new().expect("node");
         node.set_renderer_delegate(Some(&counting_renderer_delegate(&first_calls)));
         let second = counting_renderer_delegate(&second_calls);
         node.set_renderer_delegate(Some(&second));
-        second
+        assert_eq!(Arc::strong_count(&first_calls), 2);
+        assert_eq!(
+            node.renderer_delegate().map(|delegate| delegate.as_ptr()),
+            Some(second.as_ptr())
+        );
+        node.set_renderer_delegate(Some(&second));
+        node.set_renderer_delegate(None);
+        drop(second);
+        assert_eq!(Arc::strong_count(&second_calls), 2);
+        Transaction::flush();
     });
     assert_eq!(Arc::strong_count(&first_calls), 1);
-
-    common::autoreleasepool(|| invoke_render(&node, &renderer));
-    assert_eq!(first_calls.load(Ordering::SeqCst), 0);
-    assert_eq!(second_calls.load(Ordering::SeqCst), 1);
-    common::autoreleasepool(|| node.set_renderer_delegate(None));
-    drop(second);
     assert_eq!(Arc::strong_count(&second_calls), 1);
+}
+
+#[test]
+fn only_the_current_renderer_delegate_runs() {
+    let device = MetalDevice::system_default().expect("device");
+    let texture = common::render_target(&device, 16, pixel_format::BGRA8UNORM).expect("texture");
+    let (scene, cube_node, camera_node) = common::green_cube_scene().expect("scene");
+    let renderer = Renderer::new(Some(&device)).expect("renderer");
+    renderer.set_scene(Some(&scene));
+    renderer.set_point_of_view(Some(&camera_node));
+    let first_calls = Arc::new(AtomicUsize::new(0));
+    let second_calls = Arc::new(AtomicUsize::new(0));
+    let first = counting_renderer_delegate(&first_calls);
+    let second = counting_renderer_delegate(&second_calls);
+
+    cube_node.set_renderer_delegate(Some(&first));
+    Transaction::flush();
+    common::render_frame(&device, &renderer, &texture, 0.0).expect("render");
+    assert!(first_calls.load(Ordering::SeqCst) >= 1);
+
+    cube_node.set_renderer_delegate(Some(&second));
+    Transaction::flush();
+    let first_before = first_calls.load(Ordering::SeqCst);
+    common::render_frame(&device, &renderer, &texture, 0.1).expect("render");
+    assert_eq!(first_calls.load(Ordering::SeqCst), first_before);
+    assert!(second_calls.load(Ordering::SeqCst) >= 1);
+    cube_node.set_renderer_delegate(None);
 }
 
 #[test]
 fn render_callbacks_do_not_retain_the_node_or_renderer() {
     let device = MetalDevice::system_default().expect("device");
+    let texture = common::render_target(&device, 16, pixel_format::BGRA8UNORM).expect("texture");
+    let (scene, cube_node, camera_node) = common::green_cube_scene().expect("scene");
     let renderer = Renderer::new(Some(&device)).expect("renderer");
-    let node = Node::new().expect("node");
+    renderer.set_scene(Some(&scene));
+    renderer.set_point_of_view(Some(&camera_node));
     let calls = Arc::new(AtomicUsize::new(0));
     let delegate = counting_renderer_delegate(&calls);
-    node.set_renderer_delegate(Some(&delegate));
-
-    let node_before = common::retain_count(node.as_ptr());
-    let renderer_before = common::retain_count(renderer.as_ptr());
-    for _ in 0..64 {
-        invoke_render(&node, &renderer);
+    cube_node.set_renderer_delegate(Some(&delegate));
+    Transaction::flush();
+    for frame in 0..2 {
+        common::autoreleasepool(|| {
+            common::render_frame(&device, &renderer, &texture, f64::from(frame) / 60.0)
+                .expect("render");
+        });
     }
-    assert_eq!(calls.load(Ordering::SeqCst), 64);
-    assert_eq!(common::retain_count(node.as_ptr()), node_before);
+
+    let node_before = common::retain_count(cube_node.as_ptr());
+    let renderer_before = common::retain_count(renderer.as_ptr());
+    let calls_before = calls.load(Ordering::SeqCst);
+    for frame in 2..18 {
+        common::autoreleasepool(|| {
+            common::render_frame(&device, &renderer, &texture, f64::from(frame) / 60.0)
+                .expect("render");
+        });
+    }
+    assert!(calls.load(Ordering::SeqCst) >= calls_before + 16);
+    assert_eq!(common::retain_count(cube_node.as_ptr()), node_before);
     assert_eq!(common::retain_count(renderer.as_ptr()), renderer_before);
-    node.set_renderer_delegate(None);
+    cube_node.set_renderer_delegate(None);
 }
 
 #[test]
@@ -161,13 +208,15 @@ fn offline_rendering_calls_the_node_renderer_delegate() {
 #[test]
 fn clones_keep_a_copied_renderer_delegate_alive() {
     let device = MetalDevice::system_default().expect("device");
-    let renderer = Renderer::new(Some(&device)).expect("renderer");
+    let texture = common::render_target(&device, 16, pixel_format::BGRA8UNORM).expect("texture");
     let calls = Arc::new(AtomicUsize::new(0));
 
     common::autoreleasepool(|| {
+        let (scene, _cube_node, camera_node) = common::green_cube_scene().expect("scene");
         let delegate = counting_renderer_delegate(&calls);
         let parent = Node::new().expect("parent");
-        let child = Node::new().expect("child");
+        let sphere = Geometry::sphere(0.5).expect("sphere");
+        let child = Node::with_geometry(Some(&sphere)).expect("child");
         child.set_name("child");
         child.set_renderer_delegate(Some(&delegate));
         parent.add_child_node(&child);
@@ -179,41 +228,61 @@ fn clones_keep_a_copied_renderer_delegate_alive() {
             cloned_child.renderer_delegate().is_some(),
             "SceneKit copies the renderer delegate into clones"
         );
-        invoke_render(&cloned_child, &renderer);
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        scene.root_node().add_child_node(&clone);
+        let renderer = Renderer::new(Some(&device)).expect("renderer");
+        renderer.set_scene(Some(&scene));
+        renderer.set_point_of_view(Some(&camera_node));
+        common::render_frame(&device, &renderer, &texture, 0.0).expect("render");
+        let calls_seen = calls.load(Ordering::SeqCst);
+        assert!(
+            calls_seen >= 1,
+            "rendering the clone calls the copied delegate"
+        );
 
         child.set_renderer_delegate(None);
         drop(delegate);
+        drop(child);
+        drop(parent);
         assert_eq!(
             Arc::strong_count(&calls),
             2,
             "the clone still owns the callbacks"
         );
-        invoke_render(&cloned_child, &renderer);
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
-
-        cloned_child.set_renderer_delegate(None);
+        common::render_frame(&device, &renderer, &texture, 0.1).expect("render");
+        assert_eq!(calls.load(Ordering::SeqCst), calls_seen);
+        Transaction::flush();
     });
     assert_eq!(Arc::strong_count(&calls), 1);
 }
 
 #[test]
 fn constraint_keeps_its_avoid_occluder_delegate_alive() {
-    let target = Node::new().expect("target");
-    let occluder = Node::new().expect("occluder");
-    let subject = Node::new().expect("subject");
-    let constraint = AvoidOccluderConstraint::new(Some(&target)).expect("constraint");
     let should_calls = Arc::new(AtomicUsize::new(0));
     let did_calls = Arc::new(AtomicUsize::new(0));
-    let should = |constraint: &AvoidOccluderConstraint| unsafe {
-        common::scn_avoid_occluder_constraint_test_invoke_should(
-            constraint.as_ptr(),
-            occluder.as_ptr(),
-            subject.as_ptr(),
-        )
-    };
 
     common::autoreleasepool(|| {
+        let target = Node::new().expect("target");
+        let occluder = Node::new().expect("occluder");
+        let subject = Node::new().expect("subject");
+        let constraint = AvoidOccluderConstraint::new(Some(&target)).expect("constraint");
+        let should = |constraint: &AvoidOccluderConstraint| {
+            common::send_with_three_objects(
+                common::send_object(constraint.as_ptr(), c"delegate"),
+                c"avoidOccluderConstraint:shouldAvoidOccluder:forNode:",
+                constraint.as_ptr(),
+                occluder.as_ptr(),
+                subject.as_ptr(),
+            )
+        };
+        let did = |constraint: &AvoidOccluderConstraint| {
+            common::send_void_with_three_objects(
+                common::send_object(constraint.as_ptr(), c"delegate"),
+                c"avoidOccluderConstraint:didAvoidOccluder:forNode:",
+                constraint.as_ptr(),
+                occluder.as_ptr(),
+                subject.as_ptr(),
+            );
+        };
         let delegate = AvoidOccluderConstraintDelegate::new(
             AvoidOccluderConstraintDelegateCallbacks::new()
                 .on_should_avoid_occluder({
@@ -233,13 +302,7 @@ fn constraint_keeps_its_avoid_occluder_delegate_alive() {
         .expect("delegate");
         constraint.set_delegate(Some(&delegate));
         assert!(!should(&constraint));
-        unsafe {
-            common::scn_avoid_occluder_constraint_test_invoke_did(
-                constraint.as_ptr(),
-                occluder.as_ptr(),
-                subject.as_ptr(),
-            );
-        }
+        did(&constraint);
         assert_eq!(should_calls.load(Ordering::SeqCst), 1);
         assert_eq!(did_calls.load(Ordering::SeqCst), 1);
 
@@ -253,6 +316,8 @@ fn constraint_keeps_its_avoid_occluder_delegate_alive() {
 
         constraint.set_delegate(None);
         assert!(constraint.delegate().is_none());
+        assert_eq!(Arc::strong_count(&should_calls), 2);
+        Transaction::flush();
     });
     assert_eq!(Arc::strong_count(&should_calls), 1);
     assert_eq!(Arc::strong_count(&did_calls), 1);
@@ -260,14 +325,25 @@ fn constraint_keeps_its_avoid_occluder_delegate_alive() {
 
 #[test]
 fn camera_controller_keeps_its_delegate_alive() {
-    let controller = CameraController::new().expect("camera controller");
     let events = Arc::new(Mutex::new(Vec::new()));
-    let invoke = || unsafe {
-        common::scn_camera_controller_test_invoke_delegate_inertia_will_start(controller.as_ptr());
-        common::scn_camera_controller_test_invoke_delegate_inertia_did_end(controller.as_ptr());
-    };
 
     common::autoreleasepool(|| {
+        let controller = CameraController::new().expect("camera controller");
+        let invoke = || {
+            let delegate = common::send_object(controller.as_ptr(), c"delegate");
+            if !delegate.is_null() {
+                common::send_with_object(
+                    delegate,
+                    c"cameraInertiaWillStartForController:",
+                    controller.as_ptr(),
+                );
+                common::send_with_object(
+                    delegate,
+                    c"cameraInertiaDidEndForController:",
+                    controller.as_ptr(),
+                );
+            }
+        };
         let delegate = CameraControllerDelegate::new(
             CameraControllerDelegateCallbacks::new()
                 .on_inertia_will_start({
@@ -295,20 +371,28 @@ fn camera_controller_keeps_its_delegate_alive() {
         controller.set_delegate(None);
         assert!(controller.delegate().is_none());
         invoke();
+        assert_eq!(Arc::strong_count(&events), 3);
     });
     assert_eq!(Arc::strong_count(&events), 1);
 }
 
 #[test]
 fn program_keeps_its_delegate_alive() {
-    let program = Program::new().expect("program");
     let errors = Arc::new(Mutex::new(Vec::new()));
-    let message = CString::new("shader compilation failed").expect("message");
-    let invoke = || unsafe {
-        common::scn_program_test_invoke_delegate_handle_error(program.as_ptr(), message.as_ptr());
-    };
 
     common::autoreleasepool(|| {
+        let program = Program::new().expect("program");
+        let invoke = || {
+            let delegate = common::send_object(program.as_ptr(), c"delegate");
+            if !delegate.is_null() {
+                common::send_with_two_objects(
+                    delegate,
+                    c"program:handleError:",
+                    program.as_ptr(),
+                    common::ns_error(c"scenekit-rs-tests"),
+                );
+            }
+        };
         let delegate = ProgramDelegate::new({
             let errors = Arc::clone(&errors);
             move |error| errors.lock().expect("errors").push(error.to_string())
@@ -316,10 +400,9 @@ fn program_keeps_its_delegate_alive() {
         .expect("delegate");
         program.set_delegate(Some(&delegate));
         invoke();
-        assert_eq!(
-            errors.lock().expect("errors").as_slice(),
-            ["shader compilation failed"]
-        );
+        let seen = errors.lock().expect("errors").clone();
+        assert_eq!(seen.len(), 1);
+        assert!(seen[0].contains("scenekit-rs-tests"), "{seen:?}");
 
         drop(delegate);
         assert!(program.delegate().is_some());
@@ -328,6 +411,7 @@ fn program_keeps_its_delegate_alive() {
 
         program.set_delegate(None);
         assert!(program.delegate().is_none());
+        assert_eq!(Arc::strong_count(&errors), 2);
     });
     assert_eq!(Arc::strong_count(&errors), 1);
 }

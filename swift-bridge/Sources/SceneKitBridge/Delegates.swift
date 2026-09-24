@@ -8,9 +8,6 @@ public typealias ScnNodePairCallback = @convention(c) (UnsafeMutableRawPointer?,
 public typealias ScnNodePairPredicate = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Bool
 public typealias ScnWriteImageCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
 
-private var nodeRendererDelegateKey: UInt8 = 0
-private var avoidOccluderDelegateKey: UInt8 = 0
-
 private final class NodeRendererDelegateBox: NSObject, SCNNodeRendererDelegate {
     let context: UnsafeMutableRawPointer
     let releaseContext: ScnReleaseContextCallback
@@ -43,26 +40,26 @@ public func scn_node_renderer_delegate_new(
 
 @_cdecl("scn_node_get_renderer_delegate")
 public func scn_node_get_renderer_delegate(_ nodeHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let node: SCNNode = scnBorrow(nodeHandle) else { return nil }
-    return scnRetainedDelegate(of: node, key: &nodeRendererDelegateKey)
+    guard let node: SCNNode = scnBorrow(nodeHandle),
+          let delegate = node.rendererDelegate as? NodeRendererDelegateBox
+    else { return nil }
+    return scnRetain(delegate)
 }
 
 @_cdecl("scn_node_set_renderer_delegate")
 public func scn_node_set_renderer_delegate(_ nodeHandle: UnsafeMutableRawPointer?, _ delegateHandle: UnsafeMutableRawPointer?) {
     guard let node: SCNNode = scnBorrow(nodeHandle) else { return }
     let delegate: NodeRendererDelegateBox? = scnBorrow(delegateHandle)
-    scnRetainDelegate(delegate, by: node, key: &nodeRendererDelegateKey) {
-        node.rendererDelegate = delegate
-    }
+    scnKeepDelegate(delegate, by: node)
+    node.rendererDelegate = delegate
 }
 
-func scnAdoptRendererDelegates(from original: SCNNode, to clone: SCNNode) {
-    if let delegate = objc_getAssociatedObject(original, &nodeRendererDelegateKey) as? NodeRendererDelegateBox,
-       (clone.rendererDelegate as AnyObject?) === delegate {
-        objc_setAssociatedObject(clone, &nodeRendererDelegateKey, delegate, .OBJC_ASSOCIATION_RETAIN)
+func scnKeepRendererDelegates(of node: SCNNode) {
+    if let delegate = node.rendererDelegate as? NodeRendererDelegateBox {
+        scnKeepDelegate(delegate, by: node)
     }
-    for (originalChild, cloneChild) in zip(original.childNodes, clone.childNodes) {
-        scnAdoptRendererDelegates(from: originalChild, to: cloneChild)
+    for child in node.childNodes {
+        scnKeepRendererDelegates(of: child)
     }
 }
 
@@ -123,17 +120,18 @@ public func scn_avoid_occluder_constraint_delegate_new(
 
 @_cdecl("scn_avoid_occluder_constraint_get_delegate")
 public func scn_avoid_occluder_constraint_get_delegate(_ constraintHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
-    guard let constraint: SCNAvoidOccluderConstraint = scnBorrow(constraintHandle) else { return nil }
-    return scnRetainedDelegate(of: constraint, key: &avoidOccluderDelegateKey)
+    guard let constraint: SCNAvoidOccluderConstraint = scnBorrow(constraintHandle),
+          let delegate = constraint.value(forKey: "delegate") as? AvoidOccluderConstraintDelegateBox
+    else { return nil }
+    return scnRetain(delegate)
 }
 
 @_cdecl("scn_avoid_occluder_constraint_set_delegate")
 public func scn_avoid_occluder_constraint_set_delegate(_ constraintHandle: UnsafeMutableRawPointer?, _ delegateHandle: UnsafeMutableRawPointer?) {
     guard let constraint: SCNAvoidOccluderConstraint = scnBorrow(constraintHandle) else { return }
     let delegate: AvoidOccluderConstraintDelegateBox? = scnBorrow(delegateHandle)
-    scnRetainDelegate(delegate, by: constraint, key: &avoidOccluderDelegateKey) {
-        constraint.setValue(delegate, forKey: "delegate")
-    }
+    scnKeepDelegate(delegate, by: constraint)
+    constraint.setValue(delegate, forKey: "delegate")
 }
 
 @_cdecl("scn_avoid_occluder_constraint_test_invoke_should")
