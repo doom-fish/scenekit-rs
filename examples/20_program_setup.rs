@@ -14,9 +14,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("missing program delegate")?;
     program.set_delegate(Some(&delegate));
 
-    let binding =
-        ProgramBufferBinding::new(|buffer_stream| buffer_stream.write_bytes(&[1, 2, 3, 4]))
-            .ok_or("missing program buffer binding")?;
+    let binding = ProgramBufferBinding::new(|buffer_stream| {
+        if let Err(error) = buffer_stream.write_bytes(&[1, 2, 3, 4]) {
+            eprintln!("u_payload: {error}");
+        }
+    })
+    .ok_or("missing program buffer binding")?;
     program.set_buffer_binding("u_payload", BufferFrequency::PerFrame, Some(&binding));
 
     let material = Material::new().ok_or("missing material")?;

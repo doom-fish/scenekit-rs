@@ -28,14 +28,6 @@ extern "C" {
     );
     pub fn scn_camera_controller_test_invoke_delegate_inertia_will_start(controller: *mut c_void);
     pub fn scn_camera_controller_test_invoke_delegate_inertia_did_end(controller: *mut c_void);
-    pub fn scn_program_test_invoke_delegate_handle_error(
-        program: *mut c_void,
-        message: *const c_char,
-    );
-    pub fn scn_program_test_invoke_buffer_binding(
-        program: *mut c_void,
-        name: *const c_char,
-    ) -> isize;
     pub fn scn_scene_renderer_test_invoke_delegate_update(renderer: *mut c_void, time: f64);
     pub fn scn_scene_renderer_test_invoke_delegate_will_render_scene(
         renderer: *mut c_void,

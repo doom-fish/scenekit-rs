@@ -1,11 +1,10 @@
 import Foundation
+import Metal
 import ObjectiveC
 import SceneKit
 
 public typealias ProgramErrorCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutablePointer<CChar>?) -> Void
 public typealias ProgramBufferBindingCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?) -> Void
-
-private var programBindingStoreAssociationKey: UInt8 = 0
 
 private enum ShadableObject {
     case material(SCNMaterial)
@@ -103,19 +102,6 @@ private func scnUpdatedShaderModifiers(
     return updated.isEmpty ? nil : updated
 }
 
-private final class ProgramBindingStore: NSObject {
-    var bindings: [String: ProgramBufferBindingBox] = [:]
-}
-
-private func programBindingStore(for program: SCNProgram) -> ProgramBindingStore {
-    if let store = objc_getAssociatedObject(program, &programBindingStoreAssociationKey) as? ProgramBindingStore {
-        return store
-    }
-    let store = ProgramBindingStore()
-    objc_setAssociatedObject(program, &programBindingStoreAssociationKey, store, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-    return store
-}
-
 private final class ProgramDelegateBox: NSObject, SCNProgramDelegate {
     let context: UnsafeMutableRawPointer
     let releaseContext: ScnReleaseContextCallback
@@ -159,16 +145,236 @@ private final class ProgramBufferBindingBox {
         releaseContext(context)
     }
 
-    func invoke(bufferStream: any SCNBufferStream) {
-        callback(context, Unmanaged.passUnretained(bufferStream as AnyObject).toOpaque())
+    func invoke(bufferStream: ProgramBufferStreamBox) {
+        callback(context, Unmanaged.passUnretained(bufferStream).toOpaque())
     }
 }
 
-private final class ProgramTestBufferStream: NSObject, SCNBufferStream {
-    private(set) var storage = Data()
+private let scnBufferPoolSlack = 0x40100
+
+private final class ProgramBufferStreamBox: NSObject, SCNBufferStream {
+    private let stream: any SCNBufferStream
+    private let name: String
+    let requiredLength: Int?
+    private let unknownLengthReason: String
+    let maximumLength: Int
+    private var wrote = false
+
+    fileprivate init(stream: any SCNBufferStream, name: String, requirement: ProgramBufferRequirement, maximumLength: Int) {
+        self.stream = stream
+        self.name = name
+        switch requirement {
+        case .length(let length):
+            requiredLength = length
+            unknownLengthReason = ""
+        case .unknown(let reason):
+            requiredLength = nil
+            unknownLengthReason = reason
+        }
+        self.maximumLength = maximumLength
+    }
+
+    func write(_ bytes: UnsafeRawPointer, length: Int, checked: Bool) -> String? {
+        guard length > 0 else { return "buffer `\(name)` needs at least one byte" }
+        guard length <= maximumLength else {
+            return "\(length) bytes for buffer `\(name)` exceed the \(maximumLength) bytes the Metal device can allocate"
+        }
+        if checked {
+            guard let requiredLength else {
+                return "the size of buffer `\(name)` is unknown: \(unknownLengthReason)"
+            }
+            guard length >= requiredLength else {
+                return "buffer `\(name)` needs \(requiredLength) bytes, got \(length)"
+            }
+        }
+        stream.writeBytes(bytes, count: length)
+        wrote = true
+        return nil
+    }
 
     func writeBytes(_ bytes: UnsafeRawPointer, count: Int) {
-        storage.append(bytes.assumingMemoryBound(to: UInt8.self), count: count)
+        _ = write(bytes, length: count, checked: true)
+    }
+
+    fileprivate func finish() {
+        guard !wrote, let requiredLength, requiredLength > 0, requiredLength <= maximumLength else { return }
+        let zeros = [UInt8](repeating: 0, count: requiredLength)
+        zeros.withUnsafeBytes { buffer in
+            guard let base = buffer.baseAddress else { return }
+            stream.writeBytes(base, count: requiredLength)
+        }
+    }
+}
+
+private enum ProgramBufferRequirement {
+    case length(Int)
+    case unknown(String)
+}
+
+private enum ProgramBufferReflection {
+    case lengths([Int])
+    case failed(String)
+}
+
+private struct ProgramReflectionKey: Equatable {
+    let library: ObjectIdentifier?
+    let vertexFunctionName: String?
+    let fragmentFunctionName: String?
+}
+
+private func scnVertexFormat(for type: MTLDataType) -> MTLVertexFormat? {
+    switch type {
+    case .float: return .float
+    case .float2: return .float2
+    case .float3: return .float3
+    case .float4: return .float4
+    case .half: return .half
+    case .half2: return .half2
+    case .half3: return .half3
+    case .half4: return .half4
+    case .int: return .int
+    case .int2: return .int2
+    case .int3: return .int3
+    case .int4: return .int4
+    case .uint: return .uint
+    case .uint2: return .uint2
+    case .uint3: return .uint3
+    case .uint4: return .uint4
+    case .short: return .short
+    case .short2: return .short2
+    case .short3: return .short3
+    case .short4: return .short4
+    case .ushort: return .ushort
+    case .ushort2: return .ushort2
+    case .ushort3: return .ushort3
+    case .ushort4: return .ushort4
+    case .char: return .char
+    case .char2: return .char2
+    case .char3: return .char3
+    case .char4: return .char4
+    case .uchar: return .uchar
+    case .uchar2: return .uchar2
+    case .uchar3: return .uchar3
+    case .uchar4: return .uchar4
+    default: return nil
+    }
+}
+
+private func scnPipelineBufferLengths(
+    named name: String,
+    library: MTLLibrary,
+    vertexFunctionName: String,
+    fragmentFunctionName: String
+) -> ProgramBufferReflection {
+    guard let vertexFunction = library.makeFunction(name: vertexFunctionName) else {
+        return .failed("the library has no function `\(vertexFunctionName)`")
+    }
+    guard let fragmentFunction = library.makeFunction(name: fragmentFunctionName) else {
+        return .failed("the library has no function `\(fragmentFunctionName)`")
+    }
+    let descriptor = MTLRenderPipelineDescriptor()
+    descriptor.vertexFunction = vertexFunction
+    descriptor.fragmentFunction = fragmentFunction
+    descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+    let attributes = (vertexFunction.vertexAttributes ?? []).filter { $0.isActive }
+    if !attributes.isEmpty {
+        let vertexDescriptor = MTLVertexDescriptor()
+        var offset = 0
+        for attribute in attributes {
+            guard let format = scnVertexFormat(for: attribute.attributeType) else {
+                return .failed("vertex attribute `\(attribute.name)` has a type the bridge cannot describe")
+            }
+            vertexDescriptor.attributes[attribute.attributeIndex].format = format
+            vertexDescriptor.attributes[attribute.attributeIndex].offset = offset
+            vertexDescriptor.attributes[attribute.attributeIndex].bufferIndex = 30
+            offset += 16
+        }
+        vertexDescriptor.layouts[30].stride = offset
+        descriptor.vertexDescriptor = vertexDescriptor
+    }
+    var reflection: MTLAutoreleasedRenderPipelineReflection?
+    do {
+        _ = try library.device.makeRenderPipelineState(descriptor: descriptor, options: [.argumentInfo, .bufferTypeInfo], reflection: &reflection)
+    } catch {
+        return .failed("Metal could not reflect the program: \(error.localizedDescription)")
+    }
+    guard let reflection else { return .failed("Metal returned no pipeline reflection") }
+    let arguments = (reflection.vertexArguments ?? []) + (reflection.fragmentArguments ?? [])
+    return .lengths(arguments.filter { $0.type == .buffer && $0.name == name }.map { $0.bufferDataSize })
+}
+
+private func scnProgramBufferRequirement(program: SCNProgram, name: String) -> ProgramBufferRequirement {
+    guard let vertexFunctionName = program.vertexFunctionName,
+          let fragmentFunctionName = program.fragmentFunctionName
+    else { return .unknown("the program has no Metal vertex and fragment function names") }
+    guard let library = program.library ?? MTLCreateSystemDefaultDevice()?.makeDefaultLibrary() else {
+        return .unknown("the program has no Metal library")
+    }
+    var lengths: [Int] = []
+    if #available(macOS 26.0, *) {
+        for functionName in [vertexFunctionName, fragmentFunctionName] {
+            guard let reflection = library.reflection(functionName: functionName) else {
+                return .unknown("Metal could not reflect function `\(functionName)`")
+            }
+            for binding in reflection.bindings where binding.name == name {
+                if let buffer = binding as? any MTLBufferBinding {
+                    lengths.append(buffer.bufferDataSize)
+                }
+            }
+        }
+    } else {
+        switch scnPipelineBufferLengths(named: name, library: library, vertexFunctionName: vertexFunctionName, fragmentFunctionName: fragmentFunctionName) {
+        case .lengths(let reflected): lengths = reflected
+        case .failed(let reason): return .unknown(reason)
+        }
+    }
+    guard let length = lengths.max() else {
+        return .unknown("the program's functions have no buffer argument named `\(name)`")
+    }
+    return .length(length)
+}
+
+private final class ProgramBufferRegistration {
+    private weak var program: SCNProgram?
+    private let name: String
+    private let binding: ProgramBufferBindingBox?
+    private let lock = NSLock()
+    private var cachedKey: ProgramReflectionKey?
+    private var cachedRequirement: ProgramBufferRequirement = .unknown("the program has not been reflected")
+
+    init(program: SCNProgram, name: String, binding: ProgramBufferBindingBox?) {
+        self.program = program
+        self.name = name
+        self.binding = binding
+    }
+
+    private func requirement(for program: SCNProgram) -> ProgramBufferRequirement {
+        let key = ProgramReflectionKey(
+            library: program.library.map { ObjectIdentifier($0) },
+            vertexFunctionName: program.vertexFunctionName,
+            fragmentFunctionName: program.fragmentFunctionName
+        )
+        lock.lock()
+        defer { lock.unlock() }
+        if cachedKey != key {
+            cachedRequirement = scnProgramBufferRequirement(program: program, name: name)
+            cachedKey = key
+        }
+        return cachedRequirement
+    }
+
+    func bind(stream: any SCNBufferStream) {
+        guard let program else { return }
+        let device = program.library?.device ?? MTLCreateSystemDefaultDevice()
+        let (maximum, overflow) = (device?.maxBufferLength ?? 0).subtractingReportingOverflow(scnBufferPoolSlack)
+        let box = ProgramBufferStreamBox(
+            stream: stream,
+            name: name,
+            requirement: requirement(for: program),
+            maximumLength: overflow ? 0 : max(maximum, 0)
+        )
+        binding?.invoke(bufferStream: box)
+        box.finish()
     }
 }
 
@@ -337,22 +543,22 @@ public func scn_program_get_delegate(_ programHandle: UnsafeMutableRawPointer?) 
     return scnRetain(delegate)
 }
 
+@_cdecl("scn_program_set_library")
+public func scn_program_set_library(_ programHandle: UnsafeMutableRawPointer?, _ libraryHandle: UnsafeMutableRawPointer?) {
+    guard let program: SCNProgram = scnBorrow(programHandle) else { return }
+    let library: MTLLibrary? = scnBorrow(libraryHandle)
+    program.library = library
+}
+
 @_cdecl("scn_program_set_buffer_binding")
 public func scn_program_set_buffer_binding(_ programHandle: UnsafeMutableRawPointer?, _ name: UnsafePointer<CChar>?, _ frequency: Int32, _ bindingHandle: UnsafeMutableRawPointer?) {
     guard let program: SCNProgram = scnBorrow(programHandle), let name else { return }
     let frequency = SCNBufferFrequency(rawValue: Int(frequency)) ?? .perFrame
     let bindingName = String(cString: name)
-    let store = programBindingStore(for: program)
-
-    guard let binding: ProgramBufferBindingBox = scnBorrow(bindingHandle) else {
-        store.bindings.removeValue(forKey: bindingName)
-        program.handleBinding(ofBufferNamed: bindingName, frequency: frequency) { _, _, _, _ in }
-        return
-    }
-
-    store.bindings[bindingName] = binding
-    program.handleBinding(ofBufferNamed: bindingName, frequency: frequency) { buffer, _, _, _ in
-        binding.invoke(bufferStream: buffer)
+    let binding: ProgramBufferBindingBox? = scnBorrow(bindingHandle)
+    let registration = ProgramBufferRegistration(program: program, name: bindingName, binding: binding)
+    program.handleBinding(ofBufferNamed: bindingName, frequency: frequency) { stream, _, _, _ in
+        registration.bind(stream: stream)
     }
 }
 
@@ -416,32 +622,38 @@ public func scn_geometry_set_shader_modifier(_ geometryHandle: UnsafeMutableRawP
     )
 }
 
+@_cdecl("scn_buffer_stream_required_length")
+public func scn_buffer_stream_required_length(_ bufferStreamHandle: UnsafeMutableRawPointer?, _ outLength: UnsafeMutablePointer<Int>?) -> Bool {
+    guard let stream: ProgramBufferStreamBox = scnBorrow(bufferStreamHandle),
+          let length = stream.requiredLength,
+          let outLength
+    else { return false }
+    outLength.pointee = length
+    return true
+}
+
+@_cdecl("scn_buffer_stream_maximum_length")
+public func scn_buffer_stream_maximum_length(_ bufferStreamHandle: UnsafeMutableRawPointer?) -> Int {
+    guard let stream: ProgramBufferStreamBox = scnBorrow(bufferStreamHandle) else { return 0 }
+    return stream.maximumLength
+}
+
 @_cdecl("scn_buffer_stream_write_bytes")
-public func scn_buffer_stream_write_bytes(_ bufferStreamHandle: UnsafeMutableRawPointer?, _ bytes: UnsafeRawPointer?, _ length: Int) {
-    guard let bytes else { return }
-    guard let bufferStreamHandle else { return }
-    let object = Unmanaged<AnyObject>.fromOpaque(bufferStreamHandle).takeUnretainedValue()
-    guard let bufferStream = object as? SCNBufferStream else { return }
-    bufferStream.writeBytes(bytes, count: length)
-}
-
-@_cdecl("scn_program_test_invoke_delegate_handle_error")
-public func scn_program_test_invoke_delegate_handle_error(_ programHandle: UnsafeMutableRawPointer?, _ message: UnsafePointer<CChar>?) {
-    guard let program: SCNProgram = scnBorrow(programHandle),
-          let delegate = program.delegate,
-          let message
-    else { return }
-    let error = NSError(domain: "scenekit-rs-tests", code: -1, userInfo: [NSLocalizedDescriptionKey: String(cString: message)])
-    delegate.program?(program, handleError: error)
-}
-
-@_cdecl("scn_program_test_invoke_buffer_binding")
-public func scn_program_test_invoke_buffer_binding(_ programHandle: UnsafeMutableRawPointer?, _ name: UnsafePointer<CChar>?) -> Int {
-    guard let program: SCNProgram = scnBorrow(programHandle), let name else { return -1 }
-    let bindingName = String(cString: name)
-    let store = programBindingStore(for: program)
-    guard let binding = store.bindings[bindingName] else { return -1 }
-    let bufferStream = ProgramTestBufferStream()
-    binding.invoke(bufferStream: bufferStream)
-    return bufferStream.storage.count
+public func scn_buffer_stream_write_bytes(
+    _ bufferStreamHandle: UnsafeMutableRawPointer?,
+    _ bytes: UnsafeRawPointer?,
+    _ length: Int,
+    _ checked: Bool,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> Bool {
+    outError?.pointee = nil
+    guard let stream: ProgramBufferStreamBox = scnBorrow(bufferStreamHandle), let bytes else {
+        outError?.pointee = scnDup("missing buffer stream or bytes")
+        return false
+    }
+    if let message = stream.write(bytes, length: length, checked: checked) {
+        outError?.pointee = scnDup(message)
+        return false
+    }
+    return true
 }

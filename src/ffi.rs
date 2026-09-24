@@ -613,6 +613,7 @@ extern "C" {
     ) -> *mut c_char;
     pub fn scn_program_set_delegate(program: *mut c_void, delegate: *mut c_void);
     pub fn scn_program_get_delegate(program: *mut c_void) -> *mut c_void;
+    pub fn scn_program_set_library(program: *mut c_void, library: *mut c_void);
     pub fn scn_program_set_buffer_binding(
         program: *mut c_void,
         name: *const c_char,
@@ -641,11 +642,18 @@ extern "C" {
         entry_point: *const c_char,
         shader_modifier: *const c_char,
     );
+    pub fn scn_buffer_stream_required_length(
+        buffer_stream: *mut c_void,
+        out_length: *mut usize,
+    ) -> bool;
+    pub fn scn_buffer_stream_maximum_length(buffer_stream: *mut c_void) -> usize;
     pub fn scn_buffer_stream_write_bytes(
         buffer_stream: *mut c_void,
         bytes: *const c_void,
         length: usize,
-    );
+        checked: bool,
+        out_error: *mut *mut c_char,
+    ) -> bool;
 
     pub fn scn_scene_physics_world(scene: *mut c_void) -> *mut c_void;
     pub fn scn_physics_contact_delegate_new(

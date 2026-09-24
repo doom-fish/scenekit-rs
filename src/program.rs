@@ -1,7 +1,9 @@
 use core::ffi::{c_char, c_void};
 use core::ptr;
 
-use crate::error::{take_string, SceneKitError};
+use apple_metal::MetalLibrary;
+
+use crate::error::{take_error, take_string, SceneKitError};
 use crate::ffi;
 use crate::geometry::Geometry;
 use crate::material::Material;
@@ -267,12 +269,54 @@ impl Shadable for Material {
 }
 
 impl BufferStream {
+    #[must_use]
+    pub fn required_length(&self) -> Option<usize> {
+        let mut length = 0;
+        unsafe { ffi::scn_buffer_stream_required_length(self.ptr, &raw mut length) }
+            .then_some(length)
+    }
+
+    #[must_use]
+    pub fn maximum_length(&self) -> usize {
+        unsafe { ffi::scn_buffer_stream_maximum_length(self.ptr) }
+    }
+
     /// Mirrors `SCNBufferStream.writeBytes`.
-    pub fn write_bytes(&self, bytes: &[u8]) {
-        if bytes.is_empty() {
-            return;
+    pub fn write_bytes(&self, bytes: &[u8]) -> Result<(), SceneKitError> {
+        let mut error = ptr::null_mut();
+        let written = unsafe {
+            ffi::scn_buffer_stream_write_bytes(
+                self.ptr,
+                bytes.as_ptr().cast(),
+                bytes.len(),
+                true,
+                &raw mut error,
+            )
+        };
+        if written {
+            Ok(())
+        } else {
+            Err(unsafe { take_error(error, "SCNBufferStream rejected the write") })
         }
-        unsafe { ffi::scn_buffer_stream_write_bytes(self.ptr, bytes.as_ptr().cast(), bytes.len()) };
+    }
+
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn write_bytes_unchecked(&self, bytes: &[u8]) -> Result<(), SceneKitError> {
+        let mut error = ptr::null_mut();
+        let written = unsafe {
+            ffi::scn_buffer_stream_write_bytes(
+                self.ptr,
+                bytes.as_ptr().cast(),
+                bytes.len(),
+                false,
+                &raw mut error,
+            )
+        };
+        if written {
+            Ok(())
+        } else {
+            Err(unsafe { take_error(error, "SCNBufferStream rejected the write") })
+        }
     }
 }
 
@@ -482,6 +526,15 @@ impl Program {
     pub fn delegate(&self) -> Option<ProgramDelegate> {
         DelegateObject::from_retained(unsafe { ffi::scn_program_get_delegate(self.ptr) })
             .map(|inner| ProgramDelegate { inner })
+    }
+
+    pub fn set_library(&self, library: Option<&MetalLibrary>) {
+        unsafe {
+            ffi::scn_program_set_library(
+                self.ptr,
+                library.map_or(ptr::null_mut(), MetalLibrary::as_ptr),
+            );
+        };
     }
 
     /// Sets the `SCNProgram.bufferBinding` member.

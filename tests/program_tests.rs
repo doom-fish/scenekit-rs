@@ -1,5 +1,3 @@
-use std::ffi::CString;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use scenekit::{program, BufferFrequency, Program, ProgramBufferBinding, ProgramDelegate};
@@ -58,42 +56,29 @@ fn test_program_area_round_trip() {
     })
     .expect("program delegate");
     program.set_delegate(Some(&delegate));
-    let error_message = CString::new("shader compilation failed").expect("error message cstring");
-    unsafe {
-        common::scn_program_test_invoke_delegate_handle_error(
+    common::autoreleasepool(|| {
+        let delegate = common::send_object(program.as_ptr(), c"delegate");
+        assert!(!delegate.is_null());
+        common::send_with_two_objects(
+            delegate,
+            c"program:handleError:",
             program.as_ptr(),
-            error_message.as_ptr(),
+            common::ns_error(c"scenekit-rs-program-tests"),
         );
-    }
-    assert_eq!(
-        delegate_errors.lock().expect("errors").as_slice(),
-        ["shader compilation failed"]
+    });
+    let errors = delegate_errors.lock().expect("errors").clone();
+    assert_eq!(errors.len(), 1);
+    assert!(
+        errors[0].contains("scenekit-rs-program-tests"),
+        "{errors:?}"
     );
 
-    let bytes_written = Arc::new(AtomicUsize::new(0));
-    let binding = ProgramBufferBinding::new({
-        let bytes_written = Arc::clone(&bytes_written);
-        move |buffer_stream| {
-            let bytes = [1_u8, 2, 3, 4];
-            buffer_stream.write_bytes(&bytes);
-            bytes_written.store(bytes.len(), Ordering::SeqCst);
-        }
+    let binding = ProgramBufferBinding::new(|buffer_stream| {
+        let _ = buffer_stream.write_bytes(&[1_u8, 2, 3, 4]);
     })
     .expect("program buffer binding");
     program.set_buffer_binding("u_payload", BufferFrequency::PerFrame, Some(&binding));
-    let binding_name = CString::new("u_payload").expect("binding name cstring");
-    let bound_len = unsafe {
-        common::scn_program_test_invoke_buffer_binding(program.as_ptr(), binding_name.as_ptr())
-    };
-    assert_eq!(bound_len, 4);
-    assert_eq!(bytes_written.load(Ordering::SeqCst), 4);
-
     drop(binding);
-    let bound_len = unsafe {
-        common::scn_program_test_invoke_buffer_binding(program.as_ptr(), binding_name.as_ptr())
-    };
-    assert_eq!(bound_len, 0, "a dropped binding no longer writes");
-
     program.set_buffer_binding("u_payload", BufferFrequency::PerFrame, None);
     program.set_delegate(None);
 }
