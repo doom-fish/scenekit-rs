@@ -72,6 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## Threads, callbacks and lifetimes
 
 - `View` (`SCNView`) is an `NSView`: `View::new` returns an error off the main thread, and the view's bridge calls do nothing there. `View` is neither `Send` nor `Sync`.
+- SceneKit crashes when several threads create renderers at the same moment, so `Renderer::new` and `View::new` serialize renderer creation. Rendering itself is not serialized.
 - SceneKit calls renderer, node-renderer, physics, avoid-occluder, program and animation callbacks on its rendering thread, so every callback closure must be `Send`. Each delegate's closures sit behind a mutex; a callback that re-enters its own delegate on the same thread is skipped instead of deadlocking.
 - `SCNNode.rendererDelegate`, `SCNAvoidOccluderConstraint.delegate`, `SCNCameraController.delegate` and `SCNProgram.delegate` are unretained (`assign`) in the SDK, and SceneKit loads them on its rendering thread without retaining them. A delegate that another thread clears or replaces can therefore still be in use by a frame in flight, and SceneKit offers no way to wait for that frame. The node, constraint, controller or program therefore keeps every delegate object that was set on it alive until the owner itself is freed (clones made with `Node::clone_node` keep the delegates they copied). SceneKit stops calling a node's renderer delegate before the node is freed. Dropping the Rust delegate handle deactivates its callbacks at once; the small bridge object and the closure are freed with the owner, so replacing delegates many times on one long-lived owner holds one of them per delegate.
 - `SceneRendererDelegate` and `PhysicsContactDelegate` are held weakly by SceneKit and stop when their handle is dropped.
@@ -106,7 +107,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Examples and tests
 
-The crate ships with 20 numbered examples and 29 integration test files. `tests/main_thread.rs` uses its own harness so that its `SCNView` and camera-inertia tests run on the main thread. The Swift bridge exports no test-only entry points: the tests drive SceneKit for real (offline renders, physics simulation, camera inertia) and message a delegate directly only for the two callbacks SceneKit never sends. To run the full verification suite:
+The crate ships with 20 numbered examples and 30 integration test files. `tests/main_thread.rs` uses its own harness so that its `SCNView` and camera-inertia tests run on the main thread. The Swift bridge exports no test-only entry points: the tests drive SceneKit for real (offline renders, physics simulation, camera inertia) and message a delegate directly only for the two callbacks SceneKit never sends. To run the full verification suite:
 
 ```bash
 cargo clippy --all-targets -- -D warnings

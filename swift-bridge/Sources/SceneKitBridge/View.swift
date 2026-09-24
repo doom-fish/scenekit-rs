@@ -4,6 +4,8 @@ import SceneKit
 @_cdecl("scn_view_new")
 public func scn_view_new(_ width: Double, _ height: Double) -> UnsafeMutableRawPointer? {
     guard Thread.isMainThread else { return nil }
+    scnRendererCreationLock.lock()
+    defer { scnRendererCreationLock.unlock() }
     return scnRetain(SCNView(frame: NSRect(x: 0, y: 0, width: width, height: height), options: nil))
 }
 

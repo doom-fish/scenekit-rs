@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `Renderer::new` crashed inside SceneKit (`-[SCNRenderer _initWithOptions:...]`)
+  when several threads created renderers at the same moment. Renderer creation,
+  including the renderer inside `View::new`, is now serialized;
+  `tests/renderer_creation_tests.rs` creates eight at once.
 - `renderNode` and the avoid-occluder callbacks passed +1 node and renderer
   pointers that were never released, leaking two objects per call per frame.
   They are now borrowed for the duration of the callback.

@@ -39,9 +39,13 @@ public func scn_render_pass_descriptor_new_for_texture(
     return scnRetain(box)
 }
 
+let scnRendererCreationLock = NSLock()
+
 @_cdecl("scn_renderer_new")
 public func scn_renderer_new(_ deviceHandle: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
     let device: MTLDevice? = scnBorrow(deviceHandle)
+    scnRendererCreationLock.lock()
+    defer { scnRendererCreationLock.unlock() }
     return scnRetain(SCNRenderer(device: device, options: nil))
 }
 
