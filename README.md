@@ -83,7 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## Offline rendering
 
 - `Renderer::render` takes a `CommandQueue`, encodes the frame into a new command buffer and returns it uncommitted, so no other encoder or thread can use that buffer while SceneKit encodes. Add more work to it if needed, then commit it; `commit` and `wait_until_completed` report GPU errors.
-- `Renderer::render_into` encodes into an existing command buffer and is `unsafe`: the buffer must have no active encoder and no other thread may commit it or encode into it during the call, because Metal aborts the process in both cases. It returns an error for a buffer that was already committed or failed.
+- `Renderer::render_into` encodes into an existing command buffer through apple-metal's `CommandBuffer::encode_foreign`. It returns an error for a buffer that was already committed or failed, or that still has an apple-metal encoder open, and while SceneKit encodes, commits, enqueues and new encoders on that buffer fail with `ActiveEncoder` on every thread. Metal would abort the process in each of these cases.
 - `render` and `render_into` return an error instead of letting SceneKit abort when temporal antialiasing and jittering are both enabled (SceneKit cannot create its history texture for an offline renderer), and when the command buffer, the renderer and the render target belong to different Metal devices.
 
 ## Validation

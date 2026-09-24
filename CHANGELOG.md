@@ -84,10 +84,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** `Renderer::render(at_time, viewport, &CommandQueue, &RenderPassDescriptor)`
   encodes the frame into a new command buffer and returns it uncommitted as
   `Result<CommandBuffer, SceneKitError>`, so nothing else can use the buffer
-  while SceneKit encodes. The `unsafe` `Renderer::render_into` encodes into an
-  existing command buffer. Both return errors for committed or failed command
-  buffers, for mismatched Metal devices, and for temporal antialiasing combined
-  with jittering, instead of aborting.
+  while SceneKit encodes. `Renderer::render_into` encodes into an existing
+  command buffer inside apple-metal's `CommandBuffer::encode_foreign`, so it is
+  safe: it refuses a buffer with an open apple-metal encoder, and commits,
+  enqueues and new encoders from other threads wait out the render (a commit
+  race aborted the unchecked version with `Completed handler provided after
+  commit call` in 5 of 5 runs). Both return errors for committed or failed
+  command buffers, open encoders, mismatched Metal devices, and temporal
+  antialiasing combined with jittering, instead of aborting.
 - **Breaking:** `BufferStream::write_bytes` returns `Result<(), SceneKitError>`
   and rejects empty writes, writes shorter than the shader's buffer argument
   and writes the Metal device cannot allocate.

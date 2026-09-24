@@ -1,7 +1,7 @@
 use apple_cf::cg::CGRect;
 use apple_metal::{
-    command_buffer_status, storage_mode, texture_type, CommandBuffer, CommandQueue, MetalDevice,
-    MetalTexture,
+    command_buffer_status, storage_mode, texture_type, CommandBuffer, CommandBufferError,
+    CommandQueue, MetalDevice, MetalTexture,
 };
 
 use crate::color::Color;
@@ -109,54 +109,63 @@ impl Renderer {
         let command_buffer = queue.new_command_buffer().ok_or_else(|| {
             SceneKitError::new("MTLCommandQueue could not create a command buffer")
         })?;
-        unsafe { self.render_into(at_time, viewport, &command_buffer, pass_descriptor) }?;
+        self.render_into(at_time, viewport, &command_buffer, pass_descriptor)?;
         Ok(command_buffer)
     }
 
-    #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn render_into(
+    pub fn render_into(
         &self,
         at_time: f64,
         viewport: CGRect,
         command_buffer: &CommandBuffer,
         pass_descriptor: &RenderPassDescriptor,
     ) -> Result<(), SceneKitError> {
-        let status = command_buffer.status();
-        if status == command_buffer_status::ERROR {
-            return Err(SceneKitError::new(format!(
-                "the command buffer failed: {}",
-                command_buffer
-                    .error()
-                    .unwrap_or_else(|| "Metal reported no error message".to_owned())
-            )));
-        }
-        if !matches!(
-            status,
-            command_buffer_status::NOT_ENQUEUED | command_buffer_status::ENQUEUED
-        ) {
-            return Err(SceneKitError::new(format!(
-                "the command buffer was already committed (status {status})"
-            )));
-        }
         let mut error = core::ptr::null_mut();
-        let rendered = unsafe {
-            ffi::scn_renderer_render(
-                self.ptr,
-                at_time,
-                viewport.origin.x,
-                viewport.origin.y,
-                viewport.size.width,
-                viewport.size.height,
-                command_buffer.as_ptr(),
-                pass_descriptor.as_ptr(),
-                &raw mut error,
-            )
-        };
+        let rendered = command_buffer
+            .encode_foreign(|foreign| unsafe {
+                ffi::scn_renderer_render(
+                    self.ptr,
+                    at_time,
+                    viewport.origin.x,
+                    viewport.origin.y,
+                    viewport.size.width,
+                    viewport.size.height,
+                    foreign.command_buffer(),
+                    pass_descriptor.as_ptr(),
+                    &raw mut error,
+                )
+            })
+            .map_err(|refused| refused_command_buffer(command_buffer, &refused))?;
         if rendered {
             drop(unsafe { take_string(error) });
             Ok(())
         } else {
             Err(unsafe { take_error(error, "SCNRenderer refused to render") })
+        }
+    }
+}
+
+fn refused_command_buffer(
+    command_buffer: &CommandBuffer,
+    refused: &CommandBufferError,
+) -> SceneKitError {
+    match (refused, command_buffer.status()) {
+        (CommandBufferError::InvalidState { .. }, command_buffer_status::ERROR) => {
+            SceneKitError::new(format!(
+                "the command buffer failed: {}",
+                command_buffer
+                    .error()
+                    .unwrap_or_else(|| "Metal reported no error message".to_owned())
+            ))
+        }
+        (CommandBufferError::InvalidState { .. }, status) => SceneKitError::new(format!(
+            "the command buffer was already committed (status {status})"
+        )),
+        (CommandBufferError::ActiveEncoder, _) => {
+            SceneKitError::new("another command encoder is still open on the command buffer")
+        }
+        (refused, _) => {
+            SceneKitError::new(format!("the command buffer refused the render: {refused}"))
         }
     }
 }
