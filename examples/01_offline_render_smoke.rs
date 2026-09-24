@@ -54,15 +54,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let pass = RenderPassDescriptor::for_texture(&texture, Color::black())
         .ok_or("failed to create render pass descriptor")?;
-    let command_buffer = queue
-        .new_command_buffer()
-        .ok_or("failed to create command buffer")?;
-    renderer.render(
-        0.0,
-        CGRect::new(0.0, 0.0, 128.0, 128.0),
-        &command_buffer,
-        &pass,
-    );
+    let command_buffer =
+        renderer.render(0.0, CGRect::new(0.0, 0.0, 128.0, 128.0), &queue, &pass)?;
     command_buffer.commit()?;
     command_buffer.wait_until_completed()?;
 

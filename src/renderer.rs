@@ -1,8 +1,11 @@
 use apple_cf::cg::CGRect;
-use apple_metal::{storage_mode, texture_type, CommandBuffer, MetalDevice, MetalTexture};
+use apple_metal::{
+    command_buffer_status, storage_mode, texture_type, CommandBuffer, CommandQueue, MetalDevice,
+    MetalTexture,
+};
 
 use crate::color::Color;
-use crate::error::SceneKitError;
+use crate::error::{take_error, take_string, SceneKitError};
 use crate::ffi;
 use crate::node::Node;
 use crate::private::handle_type;
@@ -100,10 +103,43 @@ impl Renderer {
         &self,
         at_time: f64,
         viewport: CGRect,
+        queue: &CommandQueue,
+        pass_descriptor: &RenderPassDescriptor,
+    ) -> Result<CommandBuffer, SceneKitError> {
+        let command_buffer = queue.new_command_buffer().ok_or_else(|| {
+            SceneKitError::new("MTLCommandQueue could not create a command buffer")
+        })?;
+        unsafe { self.render_into(at_time, viewport, &command_buffer, pass_descriptor) }?;
+        Ok(command_buffer)
+    }
+
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn render_into(
+        &self,
+        at_time: f64,
+        viewport: CGRect,
         command_buffer: &CommandBuffer,
         pass_descriptor: &RenderPassDescriptor,
-    ) {
-        unsafe {
+    ) -> Result<(), SceneKitError> {
+        let status = command_buffer.status();
+        if status == command_buffer_status::ERROR {
+            return Err(SceneKitError::new(format!(
+                "the command buffer failed: {}",
+                command_buffer
+                    .error()
+                    .unwrap_or_else(|| "Metal reported no error message".to_owned())
+            )));
+        }
+        if !matches!(
+            status,
+            command_buffer_status::NOT_ENQUEUED | command_buffer_status::ENQUEUED
+        ) {
+            return Err(SceneKitError::new(format!(
+                "the command buffer was already committed (status {status})"
+            )));
+        }
+        let mut error = core::ptr::null_mut();
+        let rendered = unsafe {
             ffi::scn_renderer_render(
                 self.ptr,
                 at_time,
@@ -113,8 +149,15 @@ impl Renderer {
                 viewport.size.height,
                 command_buffer.as_ptr(),
                 pass_descriptor.as_ptr(),
-            );
+                &raw mut error,
+            )
         };
+        if rendered {
+            drop(unsafe { take_string(error) });
+            Ok(())
+        } else {
+            Err(unsafe { take_error(error, "SCNRenderer refused to render") })
+        }
     }
 }
 

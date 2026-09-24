@@ -194,7 +194,8 @@ extern "C" {
         height: f64,
         command_buffer: *mut c_void,
         pass_descriptor: *mut c_void,
-    );
+        out_error: *mut *mut c_char,
+    ) -> bool;
     pub fn scn_texture_copy_bytes(
         texture: *mut c_void,
         out_bytes: *mut c_void,

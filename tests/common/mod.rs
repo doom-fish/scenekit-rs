@@ -6,7 +6,8 @@ use std::path::Path;
 
 use apple_cf::cg::CGRect;
 use apple_metal::{
-    pixel_format, storage_mode, texture_usage, MetalDevice, MetalTexture, TextureDescriptor,
+    pixel_format, storage_mode, texture_usage, CommandQueue, MetalDevice, MetalTexture,
+    TextureDescriptor,
 };
 use scenekit::{
     read_texture_bytes, Camera, Color, Geometry, Light, LightType, Node, RenderPassDescriptor,
@@ -115,18 +116,19 @@ pub fn render_frame(
     let queue = device
         .new_command_queue()
         .ok_or("failed to create command queue")?;
+    render_frame_on(&queue, renderer, texture, time)
+}
+
+pub fn render_frame_on(
+    queue: &CommandQueue,
+    renderer: &Renderer,
+    texture: &MetalTexture,
+    time: f64,
+) -> Result<(), Box<dyn Error>> {
     let pass = RenderPassDescriptor::for_texture(texture, Color::black()).ok_or("missing pass")?;
-    let command_buffer = queue
-        .new_command_buffer()
-        .ok_or("failed to create command buffer")?;
     #[allow(clippy::cast_precision_loss)]
     let size = texture.width() as f64;
-    renderer.render(
-        time,
-        CGRect::new(0.0, 0.0, size, size),
-        &command_buffer,
-        &pass,
-    );
+    let command_buffer = renderer.render(time, CGRect::new(0.0, 0.0, size, size), queue, &pass)?;
     command_buffer.commit()?;
     command_buffer.wait_until_completed()?;
     Ok(())

@@ -59,13 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     renderer.set_point_of_view(Some(&camera_node));
 
     let pass = RenderPassDescriptor::for_texture(&texture, Color::black()).expect("pass");
-    let command_buffer = queue.new_command_buffer().expect("command buffer");
-    renderer.render(
-        0.0,
-        CGRect::new(0.0, 0.0, 256.0, 256.0),
-        &command_buffer,
-        &pass,
-    );
+    let command_buffer = renderer.render(0.0, CGRect::new(0.0, 0.0, 256.0, 256.0), &queue, &pass)?;
     command_buffer.commit()?;
     command_buffer.wait_until_completed()?;
 

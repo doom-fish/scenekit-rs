@@ -68,13 +68,36 @@ public func scn_renderer_render(
     _ width: Double,
     _ height: Double,
     _ commandBufferHandle: UnsafeMutableRawPointer?,
-    _ passDescriptorHandle: UnsafeMutableRawPointer?
-) {
+    _ passDescriptorHandle: UnsafeMutableRawPointer?,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> Bool {
+    outError?.pointee = nil
     guard let renderer: SCNRenderer = scnBorrow(rendererHandle),
           let commandBuffer: MTLCommandBuffer = scnBorrow(commandBufferHandle),
           let passDescriptor = scnBorrowRenderPassDescriptor(passDescriptorHandle)
-    else { return }
+    else {
+        outError?.pointee = scnDup("missing renderer, command buffer or render pass descriptor")
+        return false
+    }
+    guard commandBuffer.status == .notEnqueued || commandBuffer.status == .enqueued else {
+        let detail = commandBuffer.error.map { ": \($0.localizedDescription)" } ?? ""
+        outError?.pointee = scnDup("the command buffer was already committed (status \(commandBuffer.status.rawValue))\(detail)")
+        return false
+    }
+    if let device = renderer.device, device !== commandBuffer.device {
+        outError?.pointee = scnDup("the command buffer belongs to a different Metal device than the renderer")
+        return false
+    }
+    if let texture = passDescriptor.colorAttachments[0].texture, texture.device !== commandBuffer.device {
+        outError?.pointee = scnDup("the render target belongs to a different Metal device than the command buffer")
+        return false
+    }
+    if renderer.isTemporalAntialiasingEnabled, renderer.isJitteringEnabled, renderer.colorPixelFormat == .invalid {
+        outError?.pointee = scnDup("SCNRenderer cannot combine temporal antialiasing and jittering when it renders into a command buffer")
+        return false
+    }
     renderer.render(atTime: time, viewport: CGRect(x: x, y: y, width: width, height: height), commandBuffer: commandBuffer, passDescriptor: passDescriptor)
+    return true
 }
 
 @_cdecl("scn_texture_copy_bytes")
