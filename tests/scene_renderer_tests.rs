@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use apple_metal::MetalDevice;
+use apple_metal::{pixel_format, MetalDevice};
 use scenekit::{
     DebugOptions, Renderer, RenderingAPI, SceneRenderer, SceneRendererDelegate,
     SceneRendererDelegateCallbacks,
@@ -62,12 +62,21 @@ fn test_scene_renderer_trait_and_delegate_round_trip() {
     SceneRenderer::set_delegate(&renderer, Some(&delegate));
     assert!(SceneRenderer::delegate(&renderer).is_some());
 
-    unsafe {
-        common::scn_scene_renderer_test_invoke_delegate_update(renderer.as_ptr(), 1.25);
-        common::scn_scene_renderer_test_invoke_delegate_will_render_scene(renderer.as_ptr(), 1.25);
-        common::scn_scene_renderer_test_invoke_delegate_did_render_scene(renderer.as_ptr(), 1.25);
-    }
+    let texture = common::render_target(&device, 16, pixel_format::BGRA8UNORM).expect("texture");
+    let error = common::render_frame(&device, &renderer, &texture, 1.25)
+        .expect_err("temporal antialiasing with jittering aborts inside SceneKit");
+    assert!(error.to_string().contains("jittering"), "{error}");
+    assert!(events.lock().expect("events").is_empty());
+    SceneRenderer::set_jittering_enabled(&renderer, false);
+    common::render_frame(&device, &renderer, &texture, 1.25).expect("render");
 
-    let events = events.lock().expect("events");
-    assert_eq!(events.as_slice(), ["update", "will-render", "did-render"]);
+    let events = events.lock().expect("events").clone();
+    let first = |name: &str| events.iter().position(|event| *event == name);
+    let update = first("update").expect("update");
+    let will_render = first("will-render").expect("will-render");
+    let did_render = first("did-render").expect("did-render");
+    assert!(
+        update < will_render && will_render < did_render,
+        "{events:?}"
+    );
 }

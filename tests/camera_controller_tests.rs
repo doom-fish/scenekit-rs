@@ -70,10 +70,20 @@ fn test_camera_controller_properties_and_delegate_round_trip() {
     .expect("camera controller delegate");
     controller.set_delegate(Some(&delegate));
 
-    unsafe {
-        common::scn_camera_controller_test_invoke_delegate_inertia_will_start(controller.as_ptr());
-        common::scn_camera_controller_test_invoke_delegate_inertia_did_end(controller.as_ptr());
-    }
+    common::autoreleasepool(|| {
+        let delegate = common::send_object(controller.as_ptr(), c"delegate");
+        assert!(!delegate.is_null());
+        common::send_with_object(
+            delegate,
+            c"cameraInertiaWillStartForController:",
+            controller.as_ptr(),
+        );
+        common::send_with_object(
+            delegate,
+            c"cameraInertiaDidEndForController:",
+            controller.as_ptr(),
+        );
+    });
 
     assert_eq!(
         delegate_events.lock().expect("events").as_slice(),

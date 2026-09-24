@@ -1,9 +1,63 @@
+use std::ffi::c_void;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
 use scenekit::{
-    AntialiasingMode, CGPoint, Camera, Color, Geometry, InteractionMode, Node, Prepareable, Scene,
+    AntialiasingMode, CGPoint, CGSize, Camera, CameraController, CameraControllerDelegate,
+    CameraControllerDelegateCallbacks, Color, Geometry, InteractionMode, Node, Prepareable, Scene,
     SceneRenderer, SpriteScene, SpriteTransition, Technique, Vector3, View,
 };
 
 mod common;
+
+#[link(name = "CoreFoundation", kind = "framework")]
+extern "C" {
+    static kCFRunLoopDefaultMode: *const c_void;
+    fn CFRunLoopRunInMode(
+        mode: *const c_void,
+        seconds: f64,
+        return_after_source_handled: u8,
+    ) -> i32;
+}
+
+fn camera_controller_inertia_reaches_the_delegate() {
+    let camera = Camera::new().expect("camera");
+    let camera_node = Node::new().expect("camera node");
+    camera_node.set_camera(Some(&camera));
+    camera_node.set_position(Vector3::new(0.0, 0.0, 5.0));
+    let controller = CameraController::new().expect("camera controller");
+    controller.set_point_of_view(Some(&camera_node));
+    controller.set_interaction_mode(InteractionMode::OrbitTurntable);
+    controller.set_inertia_enabled(true);
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let delegate = CameraControllerDelegate::new(
+        CameraControllerDelegateCallbacks::new()
+            .on_inertia_will_start({
+                let events = Arc::clone(&events);
+                move || events.lock().expect("events").push("will-start")
+            })
+            .on_inertia_did_end({
+                let events = Arc::clone(&events);
+                move || events.lock().expect("events").push("did-end")
+            }),
+    )
+    .expect("delegate");
+    controller.set_delegate(Some(&delegate));
+
+    let viewport = CGSize::new(100.0, 100.0);
+    controller.begin_interaction(CGPoint::new(50.0, 50.0), viewport);
+    controller.continue_interaction(CGPoint::new(60.0, 50.0), viewport, 1.0);
+    controller.end_interaction(CGPoint::new(70.0, 50.0), viewport, CGPoint::new(500.0, 0.0));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while events.lock().expect("events").len() < 2 && Instant::now() < deadline {
+        unsafe { CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, 0) };
+    }
+    assert_eq!(
+        events.lock().expect("events").as_slice(),
+        ["will-start", "did-end"]
+    );
+    controller.set_delegate(None);
+}
 
 fn view_snapshot_and_properties() {
     let (view, scene, camera_node) = common::view_with_camera(80.0, 60.0).expect("view setup");
@@ -163,7 +217,7 @@ fn main() {
         unsafe { libc::pthread_main_np() } != 0,
         "this harness must run on the main thread"
     );
-    let tests: [(&str, fn()); 6] = [
+    let tests: [(&str, fn()); 7] = [
         ("view_snapshot_and_properties", view_snapshot_and_properties),
         (
             "view_hit_test_returns_named_node",
@@ -178,6 +232,10 @@ fn main() {
         (
             "extended_scene_renderer_surface",
             extended_scene_renderer_surface,
+        ),
+        (
+            "camera_controller_inertia_reaches_the_delegate",
+            camera_controller_inertia_reaches_the_delegate,
         ),
     ];
     for (name, test) in tests {

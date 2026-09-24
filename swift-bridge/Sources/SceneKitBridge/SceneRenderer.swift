@@ -453,29 +453,6 @@ public func scn_scene_renderer_set_delegate(_ rendererHandle: UnsafeMutableRawPo
     renderer.delegate = scnBorrow(delegateHandle)
 }
 
-@_cdecl("scn_scene_renderer_test_invoke_delegate_update")
-public func scn_scene_renderer_test_invoke_delegate_update(_ rendererHandle: UnsafeMutableRawPointer?, _ time: Double) {
-    guard let renderer = scnBorrowSceneRenderer(rendererHandle),
-          let delegate = renderer.delegate else { return }
-    delegate.renderer?(renderer, updateAtTime: time)
-}
-
-@_cdecl("scn_scene_renderer_test_invoke_delegate_will_render_scene")
-public func scn_scene_renderer_test_invoke_delegate_will_render_scene(_ rendererHandle: UnsafeMutableRawPointer?, _ time: Double) {
-    guard let renderer = scnBorrowSceneRenderer(rendererHandle),
-          let delegate = renderer.delegate,
-          let scene = renderer.scene else { return }
-    delegate.renderer?(renderer, willRenderScene: scene, atTime: time)
-}
-
-@_cdecl("scn_scene_renderer_test_invoke_delegate_did_render_scene")
-public func scn_scene_renderer_test_invoke_delegate_did_render_scene(_ rendererHandle: UnsafeMutableRawPointer?, _ time: Double) {
-    guard let renderer = scnBorrowSceneRenderer(rendererHandle),
-          let delegate = renderer.delegate,
-          let scene = renderer.scene else { return }
-    delegate.renderer?(renderer, didRenderScene: scene, atTime: time)
-}
-
 @_cdecl("scn_view_get_antialiasing_mode")
 public func scn_view_get_antialiasing_mode(_ viewHandle: UnsafeMutableRawPointer?) -> Int32 {
     guard let view = scnBorrowView(viewHandle) else { return -1 }

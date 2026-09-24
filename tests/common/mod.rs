@@ -15,32 +15,6 @@ use scenekit::{
 };
 
 extern "C" {
-    pub fn scn_node_test_invoke_renderer_delegate(node: *mut c_void, renderer: *mut c_void);
-    pub fn scn_avoid_occluder_constraint_test_invoke_should(
-        constraint: *mut c_void,
-        occluder: *mut c_void,
-        node: *mut c_void,
-    ) -> bool;
-    pub fn scn_avoid_occluder_constraint_test_invoke_did(
-        constraint: *mut c_void,
-        occluder: *mut c_void,
-        node: *mut c_void,
-    );
-    pub fn scn_camera_controller_test_invoke_delegate_inertia_will_start(controller: *mut c_void);
-    pub fn scn_camera_controller_test_invoke_delegate_inertia_did_end(controller: *mut c_void);
-    pub fn scn_scene_renderer_test_invoke_delegate_update(renderer: *mut c_void, time: f64);
-    pub fn scn_scene_renderer_test_invoke_delegate_will_render_scene(
-        renderer: *mut c_void,
-        time: f64,
-    );
-    pub fn scn_scene_renderer_test_invoke_delegate_did_render_scene(
-        renderer: *mut c_void,
-        time: f64,
-    );
-    pub fn scn_physics_world_test_invoke_delegate_did_begin(world: *mut c_void);
-    pub fn scn_physics_world_test_invoke_delegate_did_update(world: *mut c_void);
-    pub fn scn_physics_world_test_invoke_delegate_did_end(world: *mut c_void);
-
     fn objc_msgSend();
     fn objc_getClass(name: *const c_char) -> *mut c_void;
     fn sel_registerName(name: *const c_char) -> *mut c_void;

@@ -387,15 +387,3 @@ public func scn_camera_controller_end_interaction(_ controllerHandle: UnsafeMuta
     guard let controller: SCNCameraController = scnBorrow(controllerHandle) else { return }
     controller.endInteraction(CGPoint(x: locationX, y: locationY), withViewport: CGSize(width: viewportWidth, height: viewportHeight), velocity: CGPoint(x: velocityX, y: velocityY))
 }
-
-@_cdecl("scn_camera_controller_test_invoke_delegate_inertia_will_start")
-public func scn_camera_controller_test_invoke_delegate_inertia_will_start(_ controllerHandle: UnsafeMutableRawPointer?) {
-    guard let controller: SCNCameraController = scnBorrow(controllerHandle), let delegate = controller.delegate else { return }
-    delegate.cameraInertiaWillStart?(for: controller)
-}
-
-@_cdecl("scn_camera_controller_test_invoke_delegate_inertia_did_end")
-public func scn_camera_controller_test_invoke_delegate_inertia_did_end(_ controllerHandle: UnsafeMutableRawPointer?) {
-    guard let controller: SCNCameraController = scnBorrow(controllerHandle), let delegate = controller.delegate else { return }
-    delegate.cameraInertiaDidEnd?(for: controller)
-}

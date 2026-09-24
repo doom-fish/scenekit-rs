@@ -38,18 +38,6 @@ private final class PhysicsContactDelegateBox: NSObject, SCNPhysicsContactDelega
     func physicsWorld(_ world: SCNPhysicsWorld, didEnd contact: SCNPhysicsContact) {
         didEndContact(context, Unmanaged.passUnretained(contact).toOpaque())
     }
-
-    func invokeDidBegin(contact: SCNPhysicsContact?) {
-        didBeginContact(context, contact.map { Unmanaged.passUnretained($0).toOpaque() })
-    }
-
-    func invokeDidUpdate(contact: SCNPhysicsContact?) {
-        didUpdateContact(context, contact.map { Unmanaged.passUnretained($0).toOpaque() })
-    }
-
-    func invokeDidEnd(contact: SCNPhysicsContact?) {
-        didEndContact(context, contact.map { Unmanaged.passUnretained($0).toOpaque() })
-    }
 }
 
 @_cdecl("scn_physics_contact_delegate_new")
@@ -183,28 +171,4 @@ public func scn_physics_contact_get_penetration_distance(_ contactHandle: Unsafe
 public func scn_physics_contact_get_sweep_test_fraction(_ contactHandle: UnsafeMutableRawPointer?) -> Double {
     guard let contact: SCNPhysicsContact = scnBorrow(contactHandle) else { return 0 }
     return contact.sweepTestFraction
-}
-
-@_cdecl("scn_physics_world_test_invoke_delegate_did_begin")
-public func scn_physics_world_test_invoke_delegate_did_begin(_ worldHandle: UnsafeMutableRawPointer?) {
-    guard let world: SCNPhysicsWorld = scnBorrow(worldHandle),
-          let delegate = world.contactDelegate as? PhysicsContactDelegateBox
-    else { return }
-    delegate.invokeDidBegin(contact: nil)
-}
-
-@_cdecl("scn_physics_world_test_invoke_delegate_did_update")
-public func scn_physics_world_test_invoke_delegate_did_update(_ worldHandle: UnsafeMutableRawPointer?) {
-    guard let world: SCNPhysicsWorld = scnBorrow(worldHandle),
-          let delegate = world.contactDelegate as? PhysicsContactDelegateBox
-    else { return }
-    delegate.invokeDidUpdate(contact: nil)
-}
-
-@_cdecl("scn_physics_world_test_invoke_delegate_did_end")
-public func scn_physics_world_test_invoke_delegate_did_end(_ worldHandle: UnsafeMutableRawPointer?) {
-    guard let world: SCNPhysicsWorld = scnBorrow(worldHandle),
-          let delegate = world.contactDelegate as? PhysicsContactDelegateBox
-    else { return }
-    delegate.invokeDidEnd(contact: nil)
 }

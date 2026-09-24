@@ -63,12 +63,6 @@ func scnKeepRendererDelegates(of node: SCNNode) {
     }
 }
 
-@_cdecl("scn_node_test_invoke_renderer_delegate")
-public func scn_node_test_invoke_renderer_delegate(_ nodeHandle: UnsafeMutableRawPointer?, _ rendererHandle: UnsafeMutableRawPointer?) {
-    guard let node: SCNNode = scnBorrow(nodeHandle), let renderer: SCNRenderer = scnBorrow(rendererHandle), let delegate = node.rendererDelegate else { return }
-    delegate.renderNode?(node, renderer: renderer, arguments: [:])
-}
-
 private final class AvoidOccluderConstraintDelegateBox: NSObject, SCNAvoidOccluderConstraintDelegate {
     let context: UnsafeMutableRawPointer
     let releaseContext: ScnReleaseContextCallback
@@ -132,28 +126,6 @@ public func scn_avoid_occluder_constraint_set_delegate(_ constraintHandle: Unsaf
     let delegate: AvoidOccluderConstraintDelegateBox? = scnBorrow(delegateHandle)
     scnKeepDelegate(delegate, by: constraint)
     constraint.setValue(delegate, forKey: "delegate")
-}
-
-@_cdecl("scn_avoid_occluder_constraint_test_invoke_should")
-public func scn_avoid_occluder_constraint_test_invoke_should(
-    _ constraintHandle: UnsafeMutableRawPointer?,
-    _ occluderHandle: UnsafeMutableRawPointer?,
-    _ nodeHandle: UnsafeMutableRawPointer?
-) -> Bool {
-    guard let constraint: SCNAvoidOccluderConstraint = scnBorrow(constraintHandle), let occluder: SCNNode = scnBorrow(occluderHandle), let node: SCNNode = scnBorrow(nodeHandle) else { return true }
-    let delegate = constraint.value(forKey: "delegate") as? SCNAvoidOccluderConstraintDelegate
-    return delegate?.avoidOccluderConstraint?(constraint, shouldAvoidOccluder: occluder, for: node) ?? true
-}
-
-@_cdecl("scn_avoid_occluder_constraint_test_invoke_did")
-public func scn_avoid_occluder_constraint_test_invoke_did(
-    _ constraintHandle: UnsafeMutableRawPointer?,
-    _ occluderHandle: UnsafeMutableRawPointer?,
-    _ nodeHandle: UnsafeMutableRawPointer?
-) {
-    guard let constraint: SCNAvoidOccluderConstraint = scnBorrow(constraintHandle), let occluder: SCNNode = scnBorrow(occluderHandle), let node: SCNNode = scnBorrow(nodeHandle) else { return }
-    let delegate = constraint.value(forKey: "delegate") as? SCNAvoidOccluderConstraintDelegate
-    delegate?.avoidOccluderConstraint?(constraint, didAvoidOccluder: occluder, for: node)
 }
 
 private final class SceneExportDelegateBox: NSObject, SCNSceneExportDelegate {

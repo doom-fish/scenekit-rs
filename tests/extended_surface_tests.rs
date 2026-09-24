@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use apple_metal::MetalDevice;
+use apple_metal::{pixel_format, MetalDevice};
 use scenekit::{
     AvoidOccluderConstraint, AvoidOccluderConstraintDelegate,
     AvoidOccluderConstraintDelegateCallbacks, Geometry, Node, NodeRendererDelegate,
     NodeRendererDelegateCallbacks, PhysicsBallSocketJoint, PhysicsBody, PhysicsField,
     PhysicsFieldScope, PhysicsHingeJoint, PhysicsShape, PhysicsSliderJoint, PhysicsVehicle,
-    PhysicsVehicleWheel, Renderer, Scene, SceneExportDelegate, SceneRenderer, Vector3,
+    PhysicsVehicleWheel, Renderer, Scene, SceneExportDelegate, SceneRenderer, Transaction, Vector3,
 };
 
 mod common;
@@ -36,7 +36,10 @@ fn test_node_renderer_delegate_bridge() {
     let _ = SceneRenderer::current_viewport(&renderer);
     let reverse_z = SceneRenderer::uses_reverse_z(&renderer);
     SceneRenderer::set_uses_reverse_z(&renderer, reverse_z);
-    let node = Node::new().expect("node");
+    let (scene, _root, camera_node, _cube, cube_node) = scene_with_cube();
+    renderer.set_scene(Some(&scene));
+    renderer.set_point_of_view(Some(&camera_node));
+    let texture = common::render_target(&device, 16, pixel_format::BGRA8UNORM).expect("texture");
     let calls = Arc::new(AtomicUsize::new(0));
 
     let delegate = NodeRendererDelegate::new(NodeRendererDelegateCallbacks::new().on_render({
@@ -47,53 +50,59 @@ fn test_node_renderer_delegate_bridge() {
     }))
     .expect("node renderer delegate");
 
-    node.set_renderer_delegate(Some(&delegate));
-    assert!(node.renderer_delegate().is_some());
-    unsafe { common::scn_node_test_invoke_renderer_delegate(node.as_ptr(), renderer.as_ptr()) };
-    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    cube_node.set_renderer_delegate(Some(&delegate));
+    assert!(cube_node.renderer_delegate().is_some());
+    Transaction::flush();
+    common::render_frame(&device, &renderer, &texture, 0.0).expect("render");
+    assert!(calls.load(Ordering::SeqCst) >= 1);
 }
 
 #[test]
 fn test_avoid_occluder_delegate_bridge() {
-    let target = Node::new().expect("target");
-    let occluder = Node::new().expect("occluder");
-    let subject = Node::new().expect("subject");
-    let constraint = AvoidOccluderConstraint::new(Some(&target)).expect("constraint");
-    let events = Arc::new(Mutex::new(Vec::new()));
+    let device = MetalDevice::system_default().expect("device");
+    let texture = common::render_target(&device, 16, pixel_format::BGRA8UNORM).expect("texture");
+    let (scene, root, camera_node) = common::scene_with_camera().expect("scene setup");
+    let target_box = Geometry::box_geometry(1.0, 1.0, 1.0, 0.0).expect("target box");
+    let target = Node::with_geometry(Some(&target_box)).expect("target");
+    root.add_child_node(&target);
+    let wall_box = Geometry::box_geometry(3.0, 3.0, 0.2, 0.0).expect("wall box");
+    let wall = Node::with_geometry(Some(&wall_box)).expect("wall");
+    wall.set_name("wall");
+    wall.set_position(Vector3::new(0.0, 0.0, 2.5));
+    wall.set_category_bit_mask(2);
+    root.add_child_node(&wall);
 
+    let constraint = AvoidOccluderConstraint::new(Some(&target)).expect("constraint");
+    constraint.set_occluder_category_bit_mask(2);
+    let occluders = Arc::new(Mutex::new(Vec::new()));
     let delegate = AvoidOccluderConstraintDelegate::new(
         AvoidOccluderConstraintDelegateCallbacks::new()
             .on_should_avoid_occluder({
-                let events = Arc::clone(&events);
-                move |_, _| {
-                    events.lock().expect("events").push("should");
+                let occluders = Arc::clone(&occluders);
+                move |occluder, _| {
+                    occluders.lock().expect("occluders").push(occluder.name());
                     false
                 }
             })
-            .on_did_avoid_occluder({
-                let events = Arc::clone(&events);
-                move |_, _| events.lock().expect("events").push("did")
-            }),
+            .on_did_avoid_occluder(|_, _| {}),
     )
     .expect("avoid delegate");
-
     constraint.set_delegate(Some(&delegate));
     assert!(constraint.delegate().is_some());
-    unsafe {
-        assert!(!common::scn_avoid_occluder_constraint_test_invoke_should(
-            constraint.as_ptr(),
-            occluder.as_ptr(),
-            subject.as_ptr(),
-        ));
-        common::scn_avoid_occluder_constraint_test_invoke_did(
-            constraint.as_ptr(),
-            occluder.as_ptr(),
-            subject.as_ptr(),
-        );
+    camera_node.set_constraints(&[&constraint]);
+
+    let renderer = Renderer::new(Some(&device)).expect("renderer");
+    renderer.set_scene(Some(&scene));
+    renderer.set_point_of_view(Some(&camera_node));
+    SceneRenderer::set_playing(&renderer, true);
+    for frame in 0..3 {
+        common::render_frame(&device, &renderer, &texture, f64::from(frame) / 30.0)
+            .expect("render");
     }
 
-    let events = events.lock().expect("events");
-    assert_eq!(events.as_slice(), ["should", "did"]);
+    let occluders = occluders.lock().expect("occluders").clone();
+    assert!(!occluders.is_empty(), "SceneKit never asked about the wall");
+    assert!(occluders.iter().all(|name| name.as_deref() == Some("wall")));
 }
 
 #[test]
